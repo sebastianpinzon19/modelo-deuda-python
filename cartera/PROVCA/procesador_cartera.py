@@ -28,7 +28,7 @@ Este script procesa únicamente el archivo de provisión de forma independiente.
 import pandas as pd
 import numpy as np
 from datetime import datetime, date
-from utilidades import convertir_fecha, convertir_valor, aplicar_formato_colombiano_dataframe
+from utilidades_cartera import convertir_fecha, convertir_valor, aplicar_formato_colombiano_dataframe
 import os
 import sys
 import locale
@@ -466,7 +466,7 @@ def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
         df = aplicar_formato_final(df)
         
         # Definir carpeta de salida
-        output_dir = r'C:\wamp64\www\cartera\PROVCA_PROCESADOS'
+        output_dir = r'C:\wamp64\www\modelo-deuda-python\cartera\resultados'
         os.makedirs(output_dir, exist_ok=True)
         
         if not output_path:

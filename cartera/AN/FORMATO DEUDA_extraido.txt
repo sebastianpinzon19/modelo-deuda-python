@@ -1,0 +1,202 @@
+Párrafo 1: AREA DE CARTERA 
+Párrafo 2: PROCESO FORMATO DEUDA
+Párrafo 3: Objetivo 
+El objetivo de implementar el formato de deuda es contar con la información necesaria de manera óptima, veraz y oportuna, lo que permitirá elaborar de forma eficiente el reporte requerido por la casa matriz.
+Párrafo 4: Información necesaria
+Párrafo 5: Se requiere la siguiente información:
+Párrafo 6: Archivo de provisión - Pisa
+Párrafo 7: Archivo de anticipos – Pisa
+Párrafo 8: Modelo Deuda
+Párrafo 9: Formato Deuda
+Párrafo 10: Archivo Balance - Jde
+Párrafo 11: Archivo Focus – Citrix una vez realizado el cierre de contabilidad
+Párrafo 12: Archivo Situación – el área de tesoreria lo envía
+Párrafo 13: Archivo Conciliaciones
+Párrafo 14: De esta información se toman los datos para el diligenciar el Formato Deuda.
+Párrafo 17: Descripción del Proceso
+Párrafo 18: Archivo de provisión
+Párrafo 19: Este archivo se emite una vez finalizado el cierre de cartera, por el sistema Pisa por las siguientes opciones:
+Párrafo 20: 40  GESLOC      GESTION LOCAL   
+Párrafo 21: 10  CARTERA     LISTADOS CARTERA
+Párrafo 22: 18  PROVCAE     Provisión de Cartera a e-mail
+Párrafo 24: El archivo llega al correo con el nombre provca.csv.
+Párrafo 26: Una vez se descarga el archivo se realizan las siguientes modificaciones y adiciones:
+Párrafo 28: Renombrar los campos:
+Párrafo 32: Se elimina la columna U de nombre PCIMCO
+Párrafo 33: Se elimina la fila de la empresa PL30 –  PCCDAC = 30  de valor  -614.000
+Párrafo 34: Unificar los nombres de los clientes en una sola columna, es decir los clientes que tengan datos en el campo PCNMCL (nombre persona natural) se deben copiar en la columna PCNMCM  (denominación) teniendo presente no eliminar los datos de esta columna (persona Juridica).
+Párrafo 35: Se modifican las fechas de factura (PCFEFA) y fechas de vencimiento (PCFEVE) al formato día-mes-año
+Párrafo 36: Se crean tres columnas para abrir las fechas de vencimiento a día, mes y año por separado
+Párrafo 37: Se crea una columna y se calcula los días vencidos de acuerdo al último día del mes de cierre
+Párrafo 38: Eliminar la columna PCIMCO
+Párrafo 39: Se crea una columna y se calcula los días por vencer de acuerdo al último día del mes de cierre y la fecha de vencimiento.
+Párrafo 40: Se crea una columna y se calcula el saldo vencido
+Párrafo 41: Se crea una columna y se calcula el % de dotación, es decir se ingresa el valor de 100%  si los días vencidos son iguales o mayores a 180 días 
+Párrafo 42: Se crea una columna y se calcula el valor de la dotación, si los días vencidos son iguales o mayores a 180 días el valor es igual al valor del saldo.
+Párrafo 43: Se crean columnas de los últimos seis meses vencidos y se calculan los vencimientos según la fecha de vencimiento
+Párrafo 44: Se crea una columna y se calcula el valor según las fechas de vencimiento que sean mayor o igual a 180 días.
+Párrafo 45: Se crea una columna y se calcula el valor de la mora total
+Párrafo 46: Se crean tres columnas y se calcula los valores por vencer de los tres meses siguientes al cierre según la fecha de vencimiento
+Párrafo 47: Se crea una columna y se calcula el valor Mayor a 90 días, de las facturas mayores o iguales a 90 días
+Párrafo 48: Se crea una columna y se calcula el valor total por vencer 
+Párrafo 50: Se debe validar que la suma de la mora total mas el valor por vencer sea igual al saldo de cada factura.
+Párrafo 51: Se crean columnas siete columnas para los vencimientos y se calculan así:
+Párrafo 52: Saldo no vencido	días vencidos de 0 a 29 días
+Párrafo 53: Vencido 30: 		días vencidos de 30 a 59 días 		  	   
+Párrafo 54: Vencido 60:		días vencidos de 60 a 89 días 		
+Párrafo 55: Vencido 90: 	  	días vencidos de 90 a 179 días 		
+Párrafo 56: Vencido 180:  		días vencidos de 180 a 359 días 		
+Párrafo 57: Vencido 360: 		días vencidos de 360 a 369 días 		
+Párrafo 58: Vencido + 360:  	días vencidos de +370  		
+Párrafo 60: Se debe validar que la suma de los vencimientos sea igual al saldo de cada factura.
+Párrafo 62: Crear una columna de deuda incobrable que es igual al valor de la dotación ya calculada.
+Párrafo 63: Archivo de anticipos - Pisa
+Párrafo 64: Este archivo se emite una vez finalizado el cierre de cartera, por el sistema Pisa por las siguientes opciones:
+Párrafo 66: 40  GESLOC      GESTION LOCAL   
+Párrafo 67: 10  CARTERA     LISTADOS CARTERA
+Párrafo 68: 24  CLANTI      Baja Anticipos   
+Párrafo 70: Renombrar los campos:
+Párrafo 76: El valor de Anticipo debe ser multiplicado por -1 ya que deben ser negativos.
+Párrafo 78: Modelo Deuda
+Párrafo 80: Crear un archivo nuevo con el nombre de 1 Modelo Deuda con la siguiente información:
+Párrafo 81: Tomar el archivo de provisión modificado y en una hoja (pesos) copiar todos los campos, pero se debe copiar únicamente las siguientes líneas de venta:
+Párrafo 82: Líneas en pesos: 
+Párrafo 84: Al final de los registros se deben copiar los datos del archivo anticipos ya modificado, como tiene una estructura diferente se debe colocar cada campo según el archivo de provisión, estos datos van en las columnas de saldos, saldo por vencer y saldo no vencido.
+Párrafo 87: En otra hoja (divisas) copiar las líneas en dólares y euros
+Párrafo 89: Al final de los registros se deben copiar los datos del archivo anticipos ya modificado, como tiene una estructura diferente se debe colocar cada campo según el archivo de provisión, estos datos van en las columnas de saldos, saldo por vencer y saldo no vencido.
+Párrafo 90: Al final del archivo se debe totalizar y multiplicar por la TRM (tasa de cambio representativa del mercado) del ultimo día del mes anterior, según la moneda (Dólares- Euros)
+Párrafo 91: Se deben realizar dos totales dólares y euros de todas las columnas.
+Párrafo 93: Crear otra hoja llamada vencimiento, en este se debe registrar solamente los totales por línea, por nombre cliente, totales y vencimientos:
+Párrafo 98: Los siguientes datos:
+Párrafo 100: Se diligencian según el siguiente cuadro:
+Párrafo 101: Tabla Negocio - Canal:
+Párrafo 103: De la Línea CT80
+Párrafo 106: Al final del archivo totalizar según la moneda ejemplo:
+
+--- TABLA 1 ---
+PCCDEM | EMPRESA
+PCCDAC | ACTIVIDAD
+PCDEAC | EMPRESA
+PCCDAG | CODIGO AGENTE
+PCNMAG | AGENTE
+PCCDCO | CODIGO COBRADOR
+PCNMCO | COBRADOR
+PCCDCL | CODIGO CLIENTE
+PCCDDN | IDENTIFICACION
+PCNMCL | NOMBRE
+PCNMCM | DENOMINACION COMERCIAL
+PCNMDO | DIRECCION
+PCTLF1 | TELEFONO
+PCNMPO | CIUDAD
+PCNUFC | NUMERO FACTURA
+PCORPD | TIPO
+PCFEFA | FECHA
+PCFEVE | FECHA VTO
+PCVAFA | VALOR
+PCSALD | SALDO
+
+--- TABLA 2 ---
+NCCDEM | EMPRESA
+NCCDAC | ACTIVIDAD
+NCCDCL | CODIGO CLIENTE
+WWNIT | NIT/CEDULA
+WWNMCL | NOMBRE COMERCIAL
+WWNMDO | DIRECCION
+WWTLF1 | TELEFONO
+WWNMPO | POBLACION
+CCCDFB | CODIGO AGENTE
+BDNMNM | NOMBRE AGENTE
+BDNMPA | APELLIDO AGENTE
+NCMOMO | TIPO ANTICIPO
+NCCDR3 | NRO ANTICIPO
+NCIMAN | VALOR ANTICIPO
+NCFEGR | FECHA ANTICIPO
+
+--- TABLA 3 ---
+Código | Empresa | Actividad
+CT | 80 | TINTA-CLUB DEL LIBRO SAS
+ED | 41 | PLANETA CREDI. ELITE 2000
+ED | 44 | PLANETA VENTA DIGITAL
+ED | 47 | EVENTOS FERIA CREDITO
+PL | 10 | MERMA GRANDES SUPERFICIES
+PL | 15 | MARKETING DIRECTO - WEB
+PL | 20 | LIBRERIAS (PLANETA)
+PL | 21 | LIBRERIA GDES SUPERFICIES
+PL | 23 | EVENTOS FERIAS LIBRERIA 1
+PL | 25 | DISTRIBUIDORA - PLANETA
+PL | 28 | VENTA SALDOS LIBRERIAS
+PL | 29 | VENTA SALDOS DISTR/BDORA
+PL | 31 | PLACISMO - COLOMBIANA
+PL | 32 | DISTRIBUCION DE TERCEROS
+PL | 53 | FERIA PLANETA LECTOR
+PL | 56 | VENTA DIGITAL LIBRERIAS
+PL | 60 | VENTA INSTITUCIONAL
+PL | 62 | NEGOCIO PERIODICOS
+PL | 63 | CANAL PROMOCION ESCOLAR
+PL | 64 | NEGOCIO LICITACIONES
+PL | 65 | VENTA CLIENTES ESPECIALES
+PL | 66 | AULA PLANETA
+PL | 69 | VENTA AUTORES SIN DERECHO
+
+--- TABLA 4 ---
+Código | Empresa | Actividad
+PL | 11 | TERCEROS DOLARES N.E.
+PL | 18 | COLOMBIANA TERCEROS DOLARES
+PL | 57 | COLOMBIANA AULA PLANETA DOLARES
+PL | 41 | COLOMBIANA TERCEROS EURO N.E.
+
+--- TABLA 5 ---
+Pais
+NEGOCIO
+CANAL
+COBRO/PAGO
+MONEDA
+CLIENTE
+SALDO TOTAL
+Saldo No vencido
+Vencido 30
+Vencido 60
+Vencido 90
+Vencido 180
+Vencido 360
+Vencido + 360
+DEUDA INCOBRABLE
+
+--- TABLA 6 ---
+País:            Colombia
+NEGOCIO:   Según tabla
+CANAL:        Según tabla
+COBRO/PAGO: CLIENTE
+MONEDA:    PESOS COL – DÓLAR – EURO  (SEGÚN LINEA DE LA TABLA)
+
+--- TABLA 7 ---
+Etiquetas de fila | CANAL
+E-COMMERCE | PL15
+LIBRERIAS 1 | PL20
+ | PL25
+LIBRERIAS 2 | PL10
+ | PL21
+LIBRERIAS 3 | PL53
+ | PL63
+OTOS DIGITAL | PL66
+OTROS | PL60
+ | PL64
+ | PL65
+SALDOS | PL28
+ | PL29
+ | PL31
+EXPORTACION | PL18
+ | PL11
+AULA | PL57
+OTR | PL41
+
+--- TABLA 8 ---
+Pais | NEGOCIO | CANAL | TIPO | MONEDA
+COLOMBIA | TINTA CLUB DEL LIBRO | CT80 | CLIENTE | PESOS COL
+
+--- TABLA 9 ---
+MONEDA | CLIENTE | SALDO TOTAL | Saldo No vencido | Vencido 30
+Moneda Local |  | 11.569.275.051,00 | 10.622.734.919,00 | 49.957.868,00
+Dólar | 4.069,67 | 5.010.037.251,00 | 4.777.289.609,00 | 232.747.642,00
+Euro | 4.777,18 | 4.777.180,00 | - | 4.777.180,00
+ | Totales | 16.584.089.482,00 | 15.400.024.528,00 | 287.482.690,00

@@ -1,0 +1,15 @@
+[2025-08-05 16:50:05] [ERROR] Error en script Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python3" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+[2025-08-05 16:50:05] [ERROR] Error en procesamiento de anticipos: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python3" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Excepción: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python3" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:176
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_anticipos.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/anticipos_...')
+#1 {main}

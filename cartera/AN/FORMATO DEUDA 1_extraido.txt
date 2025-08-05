@@ -1,0 +1,46 @@
+Párrafo 1: DEL ARCHIVO BALANCE 
+Párrafo 3: Se toman las siguientes cuentas y se suman la columna con nombre Saldo AAF variación 
+Párrafo 4: Total cuenta objeto 43001
+Párrafo 5: 0080.43002.20
+Párrafo 6: 0080.43002.21
+Párrafo 7: 0080.43002.15
+Párrafo 8: 0080.43002.28
+Párrafo 9: 0080.43002.31
+Párrafo 10: 0080.43002.63
+Párrafo 11: Total cuenta objeto 43008
+Párrafo 12: Total cuenta objeto 43042
+Párrafo 14: Del archivo Situación
+Párrafo 15: Se toma el valor de TOTAL 01010 Columna SALDOS MES
+Párrafo 17: ARCHIVO FOCUS
+Párrafo 18: Los datos de vencimientos se tomar del archivo numero 2 de formato España
+Párrafo 20: 1 Tipos de cambio
+Párrafo 21:  Cambiar el mes de cierre y actualizar tasas de cambio
+Párrafo 23: 2. Deuda bruta NO Grupo (Inicial) = Deuda bruta NO Grupo (Final)
+Párrafo 24: 3. - Dotaciones Acumuladas (Inicial) = '+/- Provisión acumulada (Final)
+Párrafo 25: 4.  Cobro de mes - Vencida =  Deuda bruta NO Grupo (Inicial) Vencidas - Total vencido de 60 días en adelante / 1000
+Párrafo 26: 5. Cobro mes mes - Total Deuda = COBROS SITUACION (SALDO MES) / -1000 
+Párrafo 27: 6. Cobros del mes - No Vencida = =H15-D15
+Párrafo 28: 7. +/- Vencidos en el mes – vencido = VENCIDO MES 30 días signo positivo
+Párrafo 29: 8. +/- Vencidos en el mes – No vencido = D17
+Párrafo 30: 9. '+/- Vencidos en el mes – Total deuda = D17 - F17 
+Párrafo 32: 10. + Facturación del mes – vencida = 0
+Párrafo 33: 11. + Facturación del mes – no vencida = primero borrar el resultado y calcular =+Q22-H22
+Párrafo 34: '+ Facturación del mes - Columna no vencida - Deuda bruta NO Grupo (Final)-total deuda
+Párrafo 36: Dotación del mes 
+Párrafo 37: Primero borrar la dotación y calcular
+Párrafo 38: Del archivo de datos de la provisión del mes Interco RESTO
+Párrafo 39: - Dotaciones Acumuladas (Inicial)  - Provisión del mes
+Párrafo 41:  ACUMULADO
+Párrafo 42: Del archivo formato acumulado Focus prueba 
+Párrafo 43: Copiar las formular de  B54 a F54  al archivo focus  
+Párrafo 46: el resultado copiar en los siguientes
+
+--- TABLA 1 ---
+- Cobros |  | -377.486 |  | -7.717.668
++ Facturación |  | 0 |  | 9.308.786
++/- Vencidos |  | 390.143 |  | -390.143
+ |  | 12.658 |  | 1.200.974
+PROVISION |  |  |  | 
+DOTACION |  | -560.370 |  | 
+- Dotaciones |  | 672 |  | 0
++ Desdotaciones |  | 672 |  | 0

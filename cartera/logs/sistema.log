@@ -1,0 +1,4 @@
+[2025-08-05 16:49:33] [INFO] Directorio creado: logs/
+[2025-08-05 16:50:05] [INFO] Archivo anticipos subido: ANTICI (1).xlsx -> temp/anticipos_2025-08-05_16-50-05_6892363d7f15e.xlsx
+[2025-08-05 16:50:05] [INFO] Ejecutando comando: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-05_16-50-05_6892363d7f15e.xlsx" 2>&1
+[2025-08-05 16:50:05] [INFO] Reintentando con python3: python3 "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-05_16-50-05_6892363d7f15e.xlsx" 2>&1

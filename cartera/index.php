@@ -603,12 +603,12 @@ $problemasSistema = verificarSaludSistema();
             Accesos Rápidos
         </h2>
         <div class="stats-grid">
-            <a href="resultados/" class="stat-card" style="text-decoration: none; color: inherit;" target="_blank">
+            <a href="descargar_archivos.php" class="stat-card" style="text-decoration: none; color: inherit;">
                 <div class="stat-icon">
-                    <i class="fas fa-folder-open"></i>
+                    <i class="fas fa-download"></i>
                 </div>
-                <div class="stat-value">Ver</div>
-                <div class="stat-label">Resultados</div>
+                <div class="stat-value">Descargar</div>
+                <div class="stat-label">Archivos</div>
             </a>
             <a href="test_sistema.php" class="stat-card" style="text-decoration: none; color: inherit;" target="_blank">
                 <div class="stat-icon">
@@ -714,6 +714,13 @@ $problemasSistema = verificarSaludSistema();
                             if (responseData.data) {
                                 actualizarEstadisticas();
                             }
+                            
+                            // Mostrar botón para descargar archivos
+                            setTimeout(() => {
+                                if (confirm('¿Deseas descargar los archivos generados?')) {
+                                    window.location.href = 'descargar_archivos.php';
+                                }
+                            }, 2000);
                         } else {
                             showNotification(responseData.message || 'Error al procesar el archivo', 'error');
                         }

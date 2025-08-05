@@ -21,7 +21,7 @@ define('ALLOWED_EXTENSIONS', ['xlsx', 'xls', 'csv']);
 define('RETENTION_DAYS', 7);
 
 // Configuración de Python
-define('PYTHON_PATH', 'C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe');
+define('PYTHON_PATH', 'python');
 define('PYTHON_PATH_ALT', 'python');
 
 // Scripts de Python
@@ -165,10 +165,10 @@ function ejecutarScriptPython($script, $archivo) {
     exec($comando, $output, $returnCode);
     
     if ($returnCode !== 0) {
-        // Intentar con python3 si falla
-        $comando = PYTHON_PATH_ALT . " \"$script\" \"$archivo\" 2>&1";
-        escribirLog("Reintentando con python3: $comando");
-        exec($comando, $output, $returnCode);
+        // Intentar con la ruta alternativa si falla
+        $comando_alt = PYTHON_PATH_ALT . " \"$script\" \"$archivo\" 2>&1";
+        escribirLog("Reintentando con ruta alternativa: $comando_alt");
+        exec($comando_alt, $output, $returnCode);
         
         if ($returnCode !== 0) {
             $errorOutput = implode("\n", $output);

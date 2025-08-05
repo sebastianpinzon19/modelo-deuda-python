@@ -1,22 +1,19 @@
-# 🏢 SISTEMA FORMATO DEUDA - GRUPO PLANETA
+# 🚀 SISTEMA DE PROCESAMIENTO DE CARTERA - GRUPO PLANETA
 
 ## 📋 ÍNDICE
 1. [Descripción General](#descripción-general)
 2. [Arquitectura del Sistema](#arquitectura-del-sistema)
 3. [Instalación y Configuración](#instalación-y-configuración)
 4. [Funcionalidades Principales](#funcionalidades-principales)
-5. [Scripts Python](#scripts-python)
-6. [Interfaces PHP](#interfaces-php)
-7. [Pruebas del Sistema](#pruebas-del-sistema)
-8. [Guía de Uso](#guía-de-uso)
-9. [Troubleshooting](#troubleshooting)
-10. [Documentación Técnica](#documentación-técnica)
+5. [Guía de Uso](#guía-de-uso)
+6. [Troubleshooting](#troubleshooting)
+7. [Documentación Técnica](#documentación-técnica)
 
 ---
 
 ## 🎯 DESCRIPCIÓN GENERAL
 
-El **Sistema Formato Deuda** es una plataforma integral desarrollada para el área de cartera de Grupo Planeta, diseñada para procesar y transformar datos financieros del sistema Pisa en reportes estructurados requeridos por la casa matriz.
+El **Sistema de Procesamiento de Cartera** es una plataforma integral desarrollada para el área de cartera de Grupo Planeta, diseñada para procesar y transformar datos financieros del sistema Pisa en reportes estructurados requeridos por la casa matriz.
 
 ### 🎯 Objetivos
 - ✅ Procesar archivos de provisión (PROVCA) y anticipos (ANTICI)
@@ -48,10 +45,13 @@ El **Sistema Formato Deuda** es una plataforma integral desarrollada para el ár
 │   ├── index.php                        # Dashboard principal
 │   ├── procesar_formato_deuda.php       # Interfaz formato deuda
 │   ├── procesar_balance.php             # Interfaz balance
-│   ├── procesar.php                     # Procesador general
+│   ├── procesar_cartera.php             # Interfaz cartera
+│   ├── procesar_anticipos.php           # Interfaz anticipos
+│   ├── config.php                       # Configuración centralizada
 │   └── styles.css                       # Estilos CSS
 ├── 📁 resultados/                # Archivos generados
 ├── 📁 temp/                      # Archivos temporales
+├── 📁 logs/                      # Logs del sistema
 └── 📁 AN/                        # Documentos de análisis
 ```
 
@@ -85,8 +85,9 @@ pip install -r requirements.txt
 # Crear directorios necesarios
 mkdir resultados
 mkdir temp
+mkdir logs
 # Asignar permisos de escritura
-chmod 755 resultados temp
+chmod 755 resultados temp logs
 ```
 
 #### 4. Verificar Configuración
@@ -97,14 +98,14 @@ python pruebas_simples.py
 ```
 
 ### ⚙️ Configuración PHP
-Editar `front_php/configuracion.php`:
+El archivo `config.php` contiene la configuración centralizada:
 ```php
 // Ruta al ejecutable de Python
-$python_path = 'C:\\Users\\USPRBA\\AppData\\Local\\Programs\\Python\\Python313\\python.exe';
+define('PYTHON_PATH', 'C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe');
 
 // Configuraciones de archivos
-$max_file_size = 100 * 1024 * 1024; // 100MB
-$allowed_extensions = ['csv', 'xlsx', 'xls'];
+define('MAX_FILE_SIZE', 50 * 1024 * 1024); // 50MB
+define('ALLOWED_EXTENSIONS', ['xlsx', 'xls', 'csv']);
 ```
 
 ---
@@ -136,16 +137,25 @@ $allowed_extensions = ['csv', 'xlsx', 'xls'];
 - ✅ Generación de reporte consolidado
 - ✅ Análisis financiero detallado
 
-### 🔄 3. Procesador General
-**Archivo**: `procesar.php`
+### 🔄 3. Procesador de Cartera
+**Archivo**: `procesar_cartera.php`
 
 **Funcionalidades**:
-- ✅ Procesamiento flexible de cartera
-- ✅ Procesamiento de anticipos
-- ✅ Opciones de configuración
+- ✅ Procesamiento de archivos de provisión
+- ✅ Cálculos de vencimientos y dotaciones
 - ✅ Validaciones automáticas
+- ✅ Formato colombiano
 
-### 📊 4. Dashboard Principal
+### 🔄 4. Procesador de Anticipos
+**Archivo**: `procesar_anticipos.php`
+
+**Funcionalidades**:
+- ✅ Procesamiento de archivos de anticipos
+- ✅ Cálculos específicos para anticipos
+- ✅ Validaciones de negocio
+- ✅ Formato colombiano
+
+### 📊 5. Dashboard Principal
 **Archivo**: `index.php`
 
 **Funcionalidades**:
@@ -185,21 +195,6 @@ def procesar_formato_deuda_completo(
 ### 📁 PROVCA/procesador_cartera.py
 **Procesamiento de archivos de provisión**
 
-#### Funciones Principales:
-```python
-def procesar_archivo_provision(archivo_provision, fecha_cierre_str=None):
-    """Procesa archivo de provisión con 15 pasos detallados"""
-
-def limpiar_y_validar_datos(df):
-    """Limpia y valida datos del DataFrame"""
-
-def calcular_dias_vencidos(df, fecha_cierre_str=None):
-    """Calcula días vencidos y por vencer"""
-
-def calcular_vencimientos_por_rango(df):
-    """Calcula vencimientos por rangos de días"""
-```
-
 #### Proceso de 15 Pasos:
 1. **Renombrar campos** según mapeo oficial
 2. **Eliminar columna PCIMCO**
@@ -220,18 +215,6 @@ def calcular_vencimientos_por_rango(df):
 ### 📁 PROVCA/procesador_anticipos.py
 **Procesamiento de archivos de anticipos**
 
-#### Funciones Principales:
-```python
-def procesar_anticipos(input_path, output_path=None, fecha_cierre_str=None):
-    """Procesa archivo de anticipos completo"""
-
-def limpiar_y_validar_datos(df):
-    """Limpia y valida datos de anticipos"""
-
-def calcular_saldos_anticipos(df):
-    """Calcula saldos y dotaciones de anticipos"""
-```
-
 #### Características:
 - ✅ Procesamiento específico de anticipos
 - ✅ Multiplicación de valores por -1
@@ -240,15 +223,6 @@ def calcular_saldos_anticipos(df):
 
 ### 📁 PROVCA/procesador_balance_completo.py
 **Procesamiento de archivos de balance**
-
-#### Funciones Principales:
-```python
-def procesar_balance_completo(
-    archivo_balance, archivo_situacion, archivo_focus, 
-    output_path=None
-):
-    """Procesa los tres archivos de balance simultáneamente"""
-```
 
 #### Características:
 - ✅ Procesamiento simultáneo de 3 archivos
@@ -269,9 +243,6 @@ def convertir_valor(valor_str):
 
 def formatear_numero_colombiano(valor, es_porcentaje=False):
     """Aplica formato colombiano a números"""
-
-def aplicar_formato_colombiano_dataframe(df, columnas_numericas=None):
-    """Aplica formato colombiano a DataFrames completos"""
 ```
 
 ---
@@ -288,116 +259,23 @@ def aplicar_formato_colombiano_dataframe(df, columnas_numericas=None):
 - ✅ Información técnica del sistema
 - ✅ Documentación integrada
 
-#### Componentes:
-```php
-// Verificación de estado del sistema
-$python_path = 'C:\\Users\\USPRBA\\AppData\\Local\\Programs\\Python\\Python313\\python.exe';
-$python_ok = file_exists($python_path);
-$directorios_ok = is_dir('resultados') && is_dir('temp');
-$permisos_ok = is_writable('.');
-```
-
-### 📁 front_php/procesar_formato_deuda.php
-**Interfaz para formato deuda completo**
-
-#### Funcionalidades:
-- ✅ Upload de archivos múltiples
-- ✅ Validación de archivos
-- ✅ Configuración de fecha de cierre
-- ✅ Ejecución de procesamiento Python
-- ✅ Visualización de resultados
-- ✅ Descarga de archivos generados
-
-#### Estructura:
-```php
-// Configuración
-$python_path = 'C:\\Users\\USPRBA\\AppData\\Local\\Programs\\Python\\Python313\\python.exe';
-$python_script = 'PROVCA/procesador_formato_deuda.py';
-
-// Validación de archivos
-$archivos_requeridos = ['provision', 'anticipos'];
-$archivos_opcionales = ['balance', 'situacion', 'focus'];
-
-// Ejecución Python
-$comando = "\"$python_path\" \"$python_script\" \"{$archivos_subidos['provision']}\" \"{$archivos_subidos['anticipos']}\"";
-```
-
-### 📁 front_php/procesar_balance.php
-**Interfaz para procesamiento de balance**
-
-#### Funcionalidades:
-- ✅ Upload de archivos de balance
-- ✅ Procesamiento simultáneo
-- ✅ Generación de reportes
-- ✅ Validaciones automáticas
-
-### 📁 front_php/procesar.php
-**Procesador general**
-
-#### Funcionalidades:
-- ✅ Selección de tipo de procesamiento
-- ✅ Upload de archivos
-- ✅ Configuraciones flexibles
-- ✅ Resultados dinámicos
-
-### 📁 front_php/configuracion.php
+### 📁 front_php/config.php
 **Configuración centralizada**
 
 #### Funciones:
 ```php
-function verificar_directorios() {
-    // Verifica existencia y permisos de directorios
+function verificarSaludSistema() {
+    // Verifica estado del sistema
 }
 
-function limpiar_archivos_temporales() {
-    // Limpia archivos temporales
-}
-
-function validar_archivo_subido($archivo) {
-    // Valida archivos subidos
-}
-
-function ejecutar_script_python($comando) {
+function ejecutarScriptPython($script, $archivo) {
     // Ejecuta scripts Python de forma segura
 }
+
+function validarArchivo($archivo) {
+    // Valida archivos subidos
+}
 ```
-
----
-
-## 🧪 PRUEBAS DEL SISTEMA
-
-### 📁 PROVCA/pruebas_simples.py
-**Script de pruebas básicas**
-
-#### Pruebas Incluidas:
-1. **Estructura de archivos** - Verifica que existan todos los archivos
-2. **Dependencias** - Verifica instalación de pandas, numpy, openpyxl
-3. **Importaciones** - Verifica que se puedan importar todos los módulos
-4. **Funciones utilidades** - Prueba funciones básicas
-5. **DataFrames** - Prueba manipulación de datos
-6. **Lectura CSV** - Verifica lectura de archivos de prueba
-
-#### Ejecución:
-```bash
-cd PROVCA
-python pruebas_simples.py
-```
-
-#### Resultado Esperado:
-```
-🎉 ¡TODAS LAS PRUEBAS PASARON!
-✅ El sistema está listo para funcionar
-```
-
-### 📁 PROVCA/ejecutar_pruebas.py
-**Script de pruebas completas (avanzado)**
-
-#### Pruebas Incluidas:
-1. **Utilidades completas** - Todas las funciones de utilidades
-2. **Procesamiento provisión** - Procesamiento completo de provisión
-3. **Procesamiento anticipos** - Procesamiento completo de anticipos
-4. **Formato deuda completo** - Procesamiento integral
-5. **Lectura Excel** - Verificación de archivos generados
 
 ---
 
@@ -413,10 +291,11 @@ http://localhost/cartera/
 #### 2. Seleccionar Funcionalidad
 - **Formato Deuda Completo**: Para procesamiento principal
 - **Balance Completo**: Para archivos de balance
-- **Procesador General**: Para procesamiento flexible
+- **Cartera**: Para archivos de provisión
+- **Anticipos**: Para archivos de anticipos
 
 #### 3. Subir Archivos
-- **Archivos requeridos**: Provisión (PROVCA) y Anticipos (ANTICI)
+- **Archivos requeridos**: Según el tipo de procesamiento
 - **Archivos opcionales**: Balance, Situación, Focus
 - **Fecha de cierre**: Configurable (opcional)
 
@@ -459,8 +338,8 @@ http://localhost/cartera/
 #### 1. Error: "Python no encontrado"
 **Solución**:
 ```php
-// Verificar ruta en configuracion.php
-$python_path = 'C:\\Users\\USPRBA\\AppData\\Local\\Programs\\Python\\Python313\\python.exe';
+// Verificar ruta en config.php
+define('PYTHON_PATH', 'C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe');
 ```
 
 #### 2. Error: "Módulo no encontrado"
@@ -474,13 +353,13 @@ pip install -r requirements.txt
 **Solución**:
 ```bash
 # Verificar permisos de directorios
-chmod 755 resultados temp
+chmod 755 resultados temp logs
 ```
 
 #### 4. Error: "Archivo no válido"
 **Solución**:
 - Verificar formato de archivo (CSV/Excel)
-- Verificar tamaño máximo (100MB)
+- Verificar tamaño máximo (50MB)
 - Verificar codificación (UTF-8)
 
 #### 5. Error: "Procesamiento falló"
@@ -507,23 +386,17 @@ python pruebas_simples.py
 
 ## 📚 DOCUMENTACIÓN TÉCNICA
 
+### 📁 ESTADO_FINAL_SISTEMA.md
+**Documentación completa del estado final del sistema**
+
 ### 📁 SISTEMA_FORMATO_DEUDA_COMPLETO.md
-**Documentación completa del sistema principal**
+**Documentación técnica detallada del sistema principal**
 
-### 📁 PROVCA/README_INTEGRACION.md
-**Documentación técnica de integración Python-PHP**
+### 📁 MEJORAS_SISTEMA_ERRORES.md
+**Documentación de mejoras y manejo de errores**
 
-### 📁 AN/RESUMEN_DOCUMENTOS_AN.md
-**Análisis de documentos de especificación**
-
-### 📁 front_php/README.md
-**Documentación de interfaces PHP**
-
-### 📁 README_BALANCE.md
-**Documentación específica de balance**
-
-### 📁 README_CSS.md
-**Documentación de estilos CSS**
+### 📁 RESUMEN_PRUEBAS_FINAL.md
+**Resumen de pruebas y validaciones del sistema**
 
 ---
 
@@ -587,4 +460,4 @@ Este sistema es propiedad de **Grupo Planeta** y está diseñado específicament
 
 ---
 
-*Documentación generada automáticamente - Sistema Formato Deuda v2.0* 
+*Documentación generada automáticamente - Sistema de Procesamiento de Cartera v2.0* 

@@ -1,0 +1,54 @@
+# Archivos temporales
+temp/
+*.tmp
+*.temp
+
+# Archivos de resultados (pueden ser grandes)
+resultados/
+*.xlsx
+*.xls
+*.csv
+
+# Logs
+logs/
+*.log
+
+# Archivos de configuración local
+.env
+config.local.php
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos de cache
+cache/
+*.cache
+
+# Archivos de sesión
+sessions/
+*.sess
+
+# Archivos de error
+error_log
+access_log 

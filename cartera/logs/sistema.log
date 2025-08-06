@@ -8,3 +8,21 @@
 [2025-08-05 21:49:11] [INFO] Procesamiento de anticipos completado para: ANTICI (1).xlsx
 [2025-08-05 21:49:11] [INFO] No se encontró archivo de resultado para: ANTICI (1).xlsx
 [2025-08-05 21:49:11] [INFO] Archivo temporal eliminado: temp/anticipos_2025-08-05_21-49-07_68927c5307c6d.xlsx
+[2025-08-06 13:27:51] [INFO] Archivo anticipos subido: ANTICI (1).CSV -> temp/anticipos_2025-08-06_13-27-51_689358576a900.csv
+[2025-08-06 13:27:51] [INFO] Ejecutando comando: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-06_13-27-51_689358576a900.csv" 2>&1
+[2025-08-06 13:27:51] [INFO] Reintentando con ruta alternativa: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-06_13-27-51_689358576a900.csv" 2>&1
+[2025-08-06 13:29:24] [INFO] Archivo anticipos subido: ANTICI (1).CSV -> temp/anticipos_2025-08-06_13-29-23_689358b3f3f00.csv
+[2025-08-06 13:29:24] [INFO] Ejecutando comando: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-06_13-29-23_689358b3f3f00.csv" 2>&1
+[2025-08-06 13:29:24] [INFO] Reintentando con ruta alternativa: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-06_13-29-23_689358b3f3f00.csv" 2>&1
+[2025-08-06 13:29:36] [INFO] Archivo anticipos subido: ANTICI (1).CSV -> temp/anticipos_2025-08-06_13-29-36_689358c0950db.csv
+[2025-08-06 13:29:36] [INFO] Ejecutando comando: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-06_13-29-36_689358c0950db.csv" 2>&1
+[2025-08-06 13:29:36] [INFO] Reintentando con ruta alternativa: python "PROVCA/procesador_anticipos.py" "temp/anticipos_2025-08-06_13-29-36_689358c0950db.csv" 2>&1
+[2025-08-06 13:32:39] [INFO] Archivo cartera subido: PROVCA.xlsx -> temp/cartera_2025-08-06_13-32-39_689359777df55.xlsx
+[2025-08-06 13:32:56] [INFO] Archivo balance subido: ANTICI (1).CSV -> temp/balance_2025-08-06_13-32-56_68935988b0bd0.csv
+[2025-08-06 13:34:06] [INFO] Archivo anticipos subido: ANTICI (1).CSV -> temp/anticipos_2025-08-06_13-34-06_689359ceb441b.csv
+[2025-08-06 13:56:12] [INFO] Archivo cartera subido: PROVCA (1).CSV -> temp/cartera_2025-08-06_13-56-12_68935efc77476.csv
+[2025-08-06 13:56:20] [INFO] Archivo cartera subido: PROVCA (1).CSV -> temp/cartera_2025-08-06_13-56-20_68935f04d4b54.csv
+[2025-08-06 13:59:59] [INFO] Python encontrado en ruta específica: C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe
+[2025-08-06 14:03:41] [INFO] Python encontrado en ruta específica: C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe
+[2025-08-06 14:05:26] [INFO] Python encontrado en ruta específica: C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe
+[2025-08-06 14:46:19] [INFO] Python encontrado en ruta específica: C:\Users\USPRBA\AppData\Local\Programs\Python\Python313\python.exe

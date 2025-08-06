@@ -3,7 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 // Incluir configuración centralizada
-require_once 'config.php';
+require_once '../config.php';
 
 try {
     // Limpiar archivos antiguos

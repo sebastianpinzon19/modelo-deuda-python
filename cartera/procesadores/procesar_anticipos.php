@@ -3,7 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 // Incluir configuración centralizada
-require_once 'config.php';
+require_once '../config.php';
 
 try {
     // Limpiar archivos antiguos
@@ -29,7 +29,7 @@ try {
     $extension = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
 
     // Generar nombre único para el archivo
-    $nombreUnico = generarNombreUnico('cartera', $extension);
+    $nombreUnico = generarNombreUnico('anticipos', $extension);
     $rutaDestino = DIR_TEMP . $nombreUnico;
 
     // Mover archivo subido al directorio temporal
@@ -38,12 +38,12 @@ try {
         throw new Exception('Error al guardar el archivo en el servidor');
     }
 
-    escribirLog("Archivo cartera subido: $nombreOriginal -> $rutaDestino");
+    escribirLog("Archivo anticipos subido: $nombreOriginal -> $rutaDestino");
 
-    // Ejecutar script de Python para procesar cartera
+    // Ejecutar script de Python para procesar anticipos
     try {
-        $output = ejecutarScriptPython(SCRIPT_CARTERA, $rutaDestino);
-        escribirLog("Procesamiento de cartera completado para: $nombreOriginal");
+        $output = ejecutarScriptPython(SCRIPT_ANTICIPOS, $rutaDestino);
+        escribirLog("Procesamiento de anticipos completado para: $nombreOriginal");
     } catch (Exception $e) {
         // Limpiar archivo temporal en caso de error
         if (file_exists($rutaDestino)) {
@@ -54,7 +54,7 @@ try {
 
     // Buscar archivo de resultado generado
     $timestamp = date('Y-m-d_H-i-s');
-    $archivosResultado = glob(DIR_RESULTADOS . '*cartera*' . $timestamp . '*');
+    $archivosResultado = glob(DIR_RESULTADOS . '*anticipos*' . $timestamp . '*');
     $archivoResultado = null;
     
     if (!empty($archivosResultado)) {
@@ -67,13 +67,13 @@ try {
     // Preparar respuesta de éxito
     $respuesta = [
         'success' => true,
-        'message' => 'Archivo de cartera procesado exitosamente',
+        'message' => 'Archivo de anticipos procesado exitosamente',
         'data' => [
             'archivo_original' => $nombreOriginal,
             'archivo_procesado' => $archivoResultado ? basename($archivoResultado) : null,
             'tamano_archivo' => formatBytes($tamanoArchivo),
             'timestamp' => $timestamp,
-            'tipo_procesamiento' => 'Cartera',
+            'tipo_procesamiento' => 'Anticipos',
             'ruta_resultado' => $archivoResultado ? $archivoResultado : null
         ]
     ];
@@ -90,7 +90,7 @@ try {
     echo json_encode($respuesta);
 
 } catch (Exception $e) {
-    escribirErrorLog("Error en procesamiento de cartera: " . $e->getMessage(), $e);
+    escribirErrorLog("Error en procesamiento de anticipos: " . $e->getMessage(), $e);
     
     $respuesta = [
         'success' => false,

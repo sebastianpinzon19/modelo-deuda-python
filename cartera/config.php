@@ -22,13 +22,65 @@ define('RETENTION_DAYS', 7);
 
 // Configuración de Python
 define('PYTHON_PATH', 'python');
-define('PYTHON_PATH_ALT', 'python');
+define('PYTHON_PATH_ALT', 'python3');
+
+// Función para detectar la ruta de Python
+function detectarPythonPath() {
+    // Primero intentar con la ruta específica encontrada
+    $rutaEspecifica = 'C:\\Users\\USPRBA\\AppData\\Local\\Programs\\Python\\Python313\\python.exe';
+    if (file_exists($rutaEspecifica)) {
+        escribirLog("Python encontrado en ruta específica: $rutaEspecifica");
+        return '"' . $rutaEspecifica . '"';
+    }
+    
+    $comandos = ['python', 'python3', 'py'];
+    
+    foreach ($comandos as $comando) {
+        $output = [];
+        $returnCode = 0;
+        exec("$comando --version 2>&1", $output, $returnCode);
+        
+        if ($returnCode === 0) {
+            escribirLog("Python detectado: $comando");
+            return $comando;
+        }
+    }
+    
+    // Si no se encuentra, intentar con rutas comunes en Windows
+    $rutasWindows = [
+        'C:\\Python39\\python.exe',
+        'C:\\Python38\\python.exe',
+        'C:\\Python37\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python39\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python38\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python37\\python.exe',
+        'C:\\Users\\' . get_current_user() . '\\AppData\\Local\\Programs\\Python\\Python313\\python.exe'
+    ];
+    
+    foreach ($rutasWindows as $ruta) {
+        if (file_exists($ruta)) {
+            escribirLog("Python encontrado en ruta: $ruta");
+            return '"' . $ruta . '"';
+        }
+    }
+    
+    throw new Exception('No se pudo encontrar Python en el sistema. Verifique que esté instalado y en el PATH.');
+}
 
 // Scripts de Python
 define('SCRIPT_FORMATO_DEUDA', DIR_PYTHON . 'procesador_formato_deuda.py');
 define('SCRIPT_BALANCE', DIR_PYTHON . 'procesador_balance_completo.py');
 define('SCRIPT_CARTERA', DIR_PYTHON . 'procesador_cartera.py');
 define('SCRIPT_ANTICIPOS', DIR_PYTHON . 'procesador_anticipos.py');
+
+// Scripts específicos según reglas de negocio
+define('SCRIPT_BALANCE_ESPECIFICO', DIR_PYTHON . 'procesador_balance_especifico.py');
+define('SCRIPT_SITUACION_ESPECIFICO', DIR_PYTHON . 'procesador_situacion_especifico.py');
+define('SCRIPT_FOCUS_ESPECIFICO', DIR_PYTHON . 'procesador_focus_especifico.py');
+define('SCRIPT_DOTACION_MES', DIR_PYTHON . 'procesador_dotacion_mes.py');
+define('SCRIPT_ACUMULADO', DIR_PYTHON . 'procesador_acumulado.py');
+define('SCRIPT_TIPOS_CAMBIO', DIR_PYTHON . 'procesador_tipos_cambio.py');
+define('SCRIPT_UNIFICADOR_FINAL', DIR_PYTHON . 'unificador_final.py');
 
 // Configuración de seguridad
 define('SECURE_UPLOAD', true);
@@ -157,7 +209,16 @@ function ejecutarScriptPython($script, $archivo) {
         chmod($script, 0755);
     }
     
-    $comando = PYTHON_PATH . " \"$script\" \"$archivo\" 2>&1";
+    // Detectar la ruta de Python automáticamente
+    try {
+        $pythonPath = detectarPythonPath();
+        escribirLog("Usando Python: $pythonPath");
+    } catch (Exception $e) {
+        escribirErrorLog("Error al detectar Python: " . $e->getMessage());
+        throw new Exception('No se pudo encontrar Python en el sistema. Verifique que esté instalado.');
+    }
+    
+    $comando = $pythonPath . " \"$script\" \"$archivo\" 2>&1";
     escribirLog("Ejecutando comando: $comando");
     
     $output = [];
@@ -165,20 +226,17 @@ function ejecutarScriptPython($script, $archivo) {
     exec($comando, $output, $returnCode);
     
     if ($returnCode !== 0) {
-        // Intentar con la ruta alternativa si falla
-        $comando_alt = PYTHON_PATH_ALT . " \"$script\" \"$archivo\" 2>&1";
-        escribirLog("Reintentando con ruta alternativa: $comando_alt");
-        exec($comando_alt, $output, $returnCode);
-        
-        if ($returnCode !== 0) {
-            $errorOutput = implode("\n", $output);
-            escribirErrorLog("Error en script Python: $errorOutput");
-            throw new Exception('Error al procesar el archivo con Python: ' . $errorOutput);
-        }
+        $errorOutput = implode("\n", $output);
+        escribirErrorLog("Error en script Python: $errorOutput");
+        throw new Exception('Error al procesar el archivo con Python: ' . $errorOutput);
     }
     
     escribirLog("Script Python ejecutado exitosamente");
-    return $output;
+    return [
+        'success' => true,
+        'message' => 'Script ejecutado correctamente',
+        'output' => $output
+    ];
 }
 
 // Función para formatear bytes
@@ -325,26 +383,95 @@ function verificarSaludSistema() {
     }
     
     // Verificar scripts de Python
-    $scripts = [SCRIPT_FORMATO_DEUDA, SCRIPT_BALANCE, SCRIPT_CARTERA, SCRIPT_ANTICIPOS];
+    $scripts = [
+        SCRIPT_FORMATO_DEUDA, 
+        SCRIPT_BALANCE, 
+        SCRIPT_CARTERA, 
+        SCRIPT_ANTICIPOS,
+        SCRIPT_BALANCE_ESPECIFICO,
+        SCRIPT_SITUACION_ESPECIFICO,
+        SCRIPT_FOCUS_ESPECIFICO,
+        SCRIPT_DOTACION_MES,
+        SCRIPT_ACUMULADO,
+        SCRIPT_TIPOS_CAMBIO,
+        SCRIPT_UNIFICADOR_FINAL
+    ];
     foreach ($scripts as $script) {
         if (!file_exists($script)) {
             $problemas[] = "Script faltante: $script";
         }
     }
     
-    // Verificar comandos de Python
+    // Verificar comandos de Python de manera más robusta
     $pythonComandos = [PYTHON_PATH, PYTHON_PATH_ALT];
     $pythonDisponible = false;
+    
     foreach ($pythonComandos as $comando) {
-        exec("$comando --version 2>&1", $output, $returnCode);
-        if ($returnCode === 0) {
-            $pythonDisponible = true;
-            break;
+        // Intentar diferentes métodos de verificación
+        $comandosPrueba = [
+            "$comando --version",
+            "$comando -V",
+            "$comando -c \"import sys; print(sys.version)\"",
+            "where $comando",
+            "which $comando"
+        ];
+        
+        foreach ($comandosPrueba as $cmd) {
+            $output = [];
+            $returnCode = -1;
+            
+            // Usar diferentes métodos de ejecución
+            if (function_exists('shell_exec')) {
+                $result = shell_exec("$cmd 2>&1");
+                if ($result !== null && $result !== '') {
+                    $pythonDisponible = true;
+                    break 2;
+                }
+            }
+            
+            if (function_exists('exec')) {
+                exec("$cmd 2>&1", $output, $returnCode);
+                if ($returnCode === 0 && !empty($output)) {
+                    $pythonDisponible = true;
+                    break 2;
+                }
+            }
+            
+            if (function_exists('system')) {
+                ob_start();
+                $returnCode = system("$cmd 2>&1", $returnCode);
+                $result = ob_get_clean();
+                if ($returnCode !== false && $result !== '') {
+                    $pythonDisponible = true;
+                    break 2;
+                }
+            }
+        }
+    }
+    
+    // Verificación adicional: intentar ejecutar un script simple
+    if (!$pythonDisponible) {
+        $testScript = DIR_TEMP . 'test_python.py';
+        $testContent = "import sys\nprint('Python OK')\nprint(sys.version)\n";
+        
+        if (file_put_contents($testScript, $testContent)) {
+            $output = [];
+            $returnCode = -1;
+            exec(PYTHON_PATH . " \"$testScript\" 2>&1", $output, $returnCode);
+            
+            if ($returnCode === 0 && !empty($output)) {
+                $pythonDisponible = true;
+            }
+            
+            // Limpiar archivo de prueba
+            if (file_exists($testScript)) {
+                unlink($testScript);
+            }
         }
     }
     
     if (!$pythonDisponible) {
-        $problemas[] = "Python no está disponible en el sistema";
+        $problemas[] = "Python no está disponible en el sistema (verificar configuración del servidor)";
     }
     
     return $problemas;

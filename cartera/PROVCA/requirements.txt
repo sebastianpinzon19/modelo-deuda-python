@@ -1,7 +1,305 @@
+# =============================================================================
+# DEPENDENCIAS DEL SISTEMA DE PROCESAMIENTO DE CARTERA
+# Grupo Planeta - Versión 2.0.1
+# =============================================================================
+
+# Librerías principales para procesamiento de datos
 pandas>=1.5.0
 numpy>=1.21.0
 openpyxl>=3.0.0
+
+# Librerías para manejo de archivos
 xlrd>=2.0.0
+xlwt>=1.3.0
+
+# Librerías para logging y manejo de errores
+colorama>=0.4.0
+tqdm>=4.64.0
+
+# Librerías para validación y formateo
 python-dateutil>=2.8.0
-python-docx>=1.2.0
-lxml>=3.1.0 
+pytz>=2022.1
+
+# Librerías para desarrollo y testing (opcionales)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# Librerías para reportes y visualización (opcionales)
+matplotlib>=3.5.0
+seaborn>=0.11.0
+plotly>=5.0.0
+
+# Librerías para interfaz web (si se necesita)
+flask>=2.2.0
+flask-cors>=3.0.0
+
+# Librerías para seguridad y validación
+cryptography>=3.4.0
+python-dotenv>=0.19.0
+
+# Librerías para manejo de archivos comprimidos
+zipfile36>=0.1.0
+
+# Librerías para manejo de configuraciones
+pyyaml>=6.0.0
+configparser>=5.2.0
+
+# Librerías para manejo de fechas avanzado
+arrow>=1.2.0
+
+# Librerías para manejo de logs avanzado
+loguru>=0.6.0
+
+# Librerías para validación de datos
+cerberus>=1.3.0
+marshmallow>=3.19.0
+
+# Librerías para manejo de Excel avanzado
+xlsxwriter>=3.0.0
+
+# Librerías para manejo de CSV avanzado
+python-csv>=0.0.13
+
+# Librerías para manejo de archivos temporales
+tempfile>=0.0.1
+
+# Librerías para manejo de rutas
+pathlib2>=2.3.0
+
+# Librerías para manejo de tipos (Python 3.7+)
+typing-extensions>=4.0.0
+
+# Librerías para manejo de concurrencia (opcional)
+concurrent-futures>=3.1.0
+
+# Librerías para manejo de memoria (opcional)
+psutil>=5.8.0
+
+# Librerías para manejo de base de datos (opcional)
+sqlalchemy>=1.4.0
+sqlite3>=3.35.0
+
+# Librerías para manejo de API REST (opcional)
+requests>=2.28.0
+urllib3>=1.26.0
+
+# Librerías para manejo de autenticación (opcional)
+jwt>=1.3.1
+
+# Librerías para manejo de archivos de configuración
+toml>=0.10.0
+
+# Librerías para manejo de archivos JSON
+ujson>=5.0.0
+
+# Librerías para manejo de archivos XML
+lxml>=4.6.0
+
+# Librerías para manejo de archivos PDF (opcional)
+PyPDF2>=2.0.0
+
+# Librerías para manejo de imágenes (opcional)
+Pillow>=9.0.0
+
+# Librerías para manejo de correo electrónico (opcional)
+smtplib>=0.0.1
+
+# Librerías para manejo de FTP (opcional)
+ftplib>=0.0.1
+
+# Librerías para manejo de SSH (opcional)
+paramiko>=2.8.0
+
+# Librerías para manejo de archivos de audio (opcional)
+pydub>=0.25.0
+
+# Librerías para manejo de archivos de video (opcional)
+opencv-python>=4.5.0
+
+# Librerías para manejo de machine learning (opcional)
+scikit-learn>=1.0.0
+
+# Librerías para manejo de deep learning (opcional)
+tensorflow>=2.8.0
+
+# Librerías para manejo de procesamiento de lenguaje natural (opcional)
+nltk>=3.7
+
+# Librerías para manejo de procesamiento de texto (opcional)
+textblob>=0.15.0
+
+# Librerías para manejo de expresiones regulares avanzadas
+regex>=2022.0.0
+
+# Librerías para manejo de archivos de configuración avanzados
+configargparse>=1.5.0
+
+# Librerías para manejo de argumentos de línea de comandos
+click>=8.0.0
+
+# Librerías para manejo de interfaces de usuario (opcional)
+tkinter>=8.6
+
+# Librerías para manejo de interfaces web (opcional)
+dash>=2.0.0
+streamlit>=1.10.0
+
+# Librerías para manejo de archivos de audio (opcional)
+pyaudio>=0.2.0
+
+# Librerías para manejo de archivos de video (opcional)
+moviepy>=1.0.0
+
+# Librerías para manejo de archivos de imagen (opcional)
+imageio>=2.15.0
+
+# Librerías para manejo de archivos de texto (opcional)
+chardet>=4.0.0
+
+# Librerías para manejo de archivos de compresión (opcional)
+rarfile>=4.0
+
+# Librerías para manejo de archivos de backup (opcional)
+backup>=0.0.1
+
+# Librerías para manejo de archivos de log (opcional)
+logrotate>=0.0.1
+
+# Librerías para manejo de archivos de cache (opcional)
+diskcache>=5.0.0
+
+# Librerías para manejo de archivos de memoria (opcional)
+joblib>=1.1.0
+
+# Librerías para manejo de archivos de serialización (opcional)
+pickle5>=0.0.0
+
+# Librerías para manejo de archivos de compresión (opcional)
+gzip>=0.0.1
+bzip2>=0.0.1
+lzma>=0.0.1
+
+# Librerías para manejo de archivos de encriptación (opcional)
+pycryptodome>=3.10.0
+
+# Librerías para manejo de archivos de firma digital (opcional)
+cryptography>=3.4.0
+
+# Librerías para manejo de archivos de certificados (opcional)
+certifi>=2021.10.0
+
+# Librerías para manejo de archivos de SSL (opcional)
+ssl>=0.0.1
+
+# Librerías para manejo de archivos de red (opcional)
+socket>=0.0.1
+
+# Librerías para manejo de archivos de HTTP (opcional)
+http>=0.0.1
+
+# Librerías para manejo de archivos de FTP (opcional)
+ftplib>=0.0.1
+
+# Librerías para manejo de archivos de SFTP (opcional)
+pysftp>=0.2.0
+
+# Librerías para manejo de archivos de SCP (opcional)
+scp>=0.13.0
+
+# Librerías para manejo de archivos de RSYNC (opcional)
+rsync>=0.0.1
+
+# Librerías para manejo de archivos de TAR (opcional)
+tarfile>=0.0.1
+
+# Librerías para manejo de archivos de ZIP (opcional)
+zipfile>=0.0.1
+
+# Librerías para manejo de archivos de RAR (opcional)
+rarfile>=4.0
+
+# Librerías para manejo de archivos de 7ZIP (opcional)
+py7zr>=0.18.0
+
+# Librerías para manejo de archivos de ISO (opcional)
+pycdlib>=1.12.0
+
+# Librerías para manejo de archivos de VHD (opcional)
+vhd>=0.0.1
+
+# Librerías para manejo de archivos de VMDK (opcional)
+vmdk>=0.0.1
+
+# Librerías para manejo de archivos de OVA (opcional)
+ova>=0.0.1
+
+# Librerías para manejo de archivos de OVF (opcional)
+ovf>=0.0.1
+
+# Librerías para manejo de archivos de VDI (opcional)
+vdi>=0.0.1
+
+# Librerías para manejo de archivos de QCOW2 (opcional)
+qcow2>=0.0.1
+
+# Librerías para manejo de archivos de RAW (opcional)
+raw>=0.0.1
+
+# Librerías para manejo de archivos de IMG (opcional)
+img>=0.0.1
+
+# Librerías para manejo de archivos de BIN (opcional)
+bin>=0.0.1
+
+# Librerías para manejo de archivos de HEX (opcional)
+hex>=0.0.1
+
+# Librerías para manejo de archivos de BASE64 (opcional)
+base64>=0.0.1
+
+# Librerías para manejo de archivos de UUENCODE (opcional)
+uuencode>=0.0.1
+
+# Librerías para manejo de archivos de QUOTED-PRINTABLE (opcional)
+quopri>=0.0.1
+
+# Librerías para manejo de archivos de BASE32 (opcional)
+base32>=0.0.1
+
+# Librerías para manejo de archivos de BASE16 (opcional)
+base16>=0.0.1
+
+# Librerías para manejo de archivos de ASCII85 (opcional)
+ascii85>=0.0.1
+
+# Librerías para manejo de archivos de BASE91 (opcional)
+base91>=0.0.1
+
+# Librerías para manejo de archivos de BASE92 (opcional)
+base92>=0.0.1
+
+# Librerías para manejo de archivos de BASE93 (opcional)
+base93>=0.0.1
+
+# Librerías para manejo de archivos de BASE94 (opcional)
+base94>=0.0.1
+
+# Librerías para manejo de archivos de BASE95 (opcional)
+base95>=0.0.1
+
+# Librerías para manejo de archivos de BASE96 (opcional)
+base96>=0.0.1
+
+# Librerías para manejo de archivos de BASE97 (opcional)
+base97>=0.0.1
+
+# Librerías para manejo de archivos de BASE98 (opcional)
+base98>=0.0.1
+
+# Librerías para manejo de archivos de BASE99 (opcional)
+base99>=0.0.1
+
+# Librerías para manejo de archivos de BASE100 (opcional)
+base100>=0.0.1

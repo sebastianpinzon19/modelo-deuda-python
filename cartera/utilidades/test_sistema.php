@@ -4,7 +4,7 @@
  * Verifica el correcto funcionamiento de todos los componentes
  */
 
-require_once 'config.php';
+require_once '../config.php';
 
 // Función para mostrar resultados de pruebas
 function mostrarPrueba($nombre, $exito, $mensaje = '', $detalles = '') {

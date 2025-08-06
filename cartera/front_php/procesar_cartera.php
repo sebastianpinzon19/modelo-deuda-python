@@ -2,24 +2,28 @@
 session_start();
 header('Content-Type: text/html; charset=utf-8');
 
-// Configuración
-$python_path = 'C:\\Users\\USPRBA\\AppData\\Local\\Programs\\Python\\Python313\\python.exe';
-$python_script = '../PROVCA/procesador_cartera.py';
-$upload_dir = '../temp/';
-$max_file_size = 50 * 1024 * 1024; // 50MB
+// Incluir configuración mejorada
+require_once 'configuracion.php';
 
-// Crear directorio temporal si no existe
-if (!file_exists($upload_dir)) {
-    mkdir($upload_dir, 0777, true);
-}
+// Log de actividad
+logActivity('procesar_cartera_init');
 
 $mensaje = '';
 $resultados = null;
 $archivos_procesados = [];
+$errores_sistema = [];
+
+// Verificar permisos del sistema
+$errores_sistema = checkPermissions();
+if (!empty($errores_sistema)) {
+    $mensaje = "Errores de configuración del sistema:<br>" . implode("<br>", $errores_sistema);
+}
 
 // Procesar formulario
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errores_sistema)) {
     try {
+        logActivity('procesar_cartera_start');
+        
         $archivos_requeridos = ['balance', 'situacion', 'focus'];
         $archivos_subidos = [];
         
@@ -31,19 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $archivo = $_FILES[$tipo];
             
-            // Validaciones
-            if ($archivo['size'] > $max_file_size) {
-                throw new Exception("El archivo de $tipo es demasiado grande (máximo 50MB)");
-            }
-            
-            $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
-            if (!in_array($extension, ['xlsx', 'xls'])) {
-                throw new Exception("El archivo de $tipo debe ser un archivo Excel (.xlsx o .xls)");
+            // Validaciones usando la nueva función
+            $errores_validacion = validateFile($archivo);
+            if (!empty($errores_validacion)) {
+                throw new Exception("Error en archivo de $tipo: " . implode(", ", $errores_validacion));
             }
             
             // Guardar archivo
-            $nombre_archivo = $tipo . '_' . date('Y-m-d_H-i-s') . '.' . $extension;
-            $ruta_archivo = $upload_dir . $nombre_archivo;
+            $nombre_archivo = $tipo . '_' . date('Y-m-d_H-i-s') . '.' . pathinfo($archivo['name'], PATHINFO_EXTENSION);
+            $ruta_archivo = TEMP_DIR . $nombre_archivo;
             
             if (!move_uploaded_file($archivo['tmp_name'], $ruta_archivo)) {
                 throw new Exception("Error al guardar el archivo de $tipo");
@@ -53,30 +53,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $archivos_procesados[] = $archivo['name'];
         }
         
-        // Ejecutar procesador Python
-        $comando = "\"$python_path\" \"$python_script\" \"{$archivos_subidos['balance']}\" \"{$archivos_subidos['situacion']}\" \"{$archivos_subidos['focus']}\" 2>&1";
+        // Ejecutar procesamiento usando el orquestador principal
+        $opciones = [
+            'balance_file' => $archivos_subidos['balance'],
+            'situacion_file' => $archivos_subidos['situacion'],
+            'focus_file' => $archivos_subidos['focus']
+        ];
         
-        $output = [];
-        $return_code = 0;
+        $resultado = executePythonOrchestrator('cartera', [], $opciones);
         
-        exec($comando, $output, $return_code);
-        
-        if ($return_code !== 0) {
-            throw new Exception("Error en el procesamiento Python: " . implode("\n", $output));
-        }
-        
-        // Leer resultados
-        if (file_exists('../resultados/resultados_balance_completo.json')) {
-            $json_resultados = file_get_contents('../resultados/resultados_balance_completo.json');
-            $resultados = json_decode($json_resultados, true);
-            
-            if ($resultados === null) {
-                throw new Exception("Error al leer los resultados JSON");
-            }
-            
+        if (isset($resultado['success']) && $resultado['success']) {
+            $resultados = $resultado;
             $mensaje = "Procesamiento completado exitosamente";
+            logActivity('procesar_cartera_success', [
+                'archivos' => $archivos_procesados,
+                'resultado' => $resultado
+            ]);
         } else {
-            throw new Exception("No se encontró el archivo de resultados");
+            throw new Exception("Error en el procesamiento: " . ($resultado['error'] ?? 'Error desconocido'));
         }
         
         // Limpiar archivos temporales
@@ -88,6 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
     } catch (Exception $e) {
         $mensaje = "Error: " . $e->getMessage();
+        logActivity('procesar_cartera_error', [
+            'error' => $e->getMessage(),
+            'archivos' => $archivos_procesados ?? []
+        ]);
         
         // Limpiar archivos en caso de error
         if (isset($archivos_subidos)) {
@@ -104,6 +102,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function formatear_numero($numero, $decimales = 2) {
     return number_format($numero, $decimales, ',', '.');
 }
+
+// Obtener información del sistema para mostrar
+$system_info = getSystemInfo();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -151,6 +152,14 @@ function formatear_numero($numero, $decimales = 2) {
         .header p {
             font-size: 1.1em;
             opacity: 0.9;
+        }
+
+        .system-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 0.9em;
         }
 
         .content {
@@ -209,19 +218,17 @@ function formatear_numero($numero, $decimales = 2) {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 15px 40px;
-            border-radius: 25px;
+            padding: 15px 30px;
+            border-radius: 10px;
             font-size: 1.1em;
-            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            display: block;
-            margin: 0 auto;
+            width: 100%;
         }
 
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
 
         .submit-btn:disabled {
@@ -250,108 +257,35 @@ function formatear_numero($numero, $decimales = 2) {
         }
 
         .results-section {
-            display: none;
-        }
-
-        .results-section.show {
-            display: block;
-        }
-
-        .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .result-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            border-left: 5px solid #667eea;
-        }
-
-        .result-card h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-            display: flex;
-            align-items: center;
-        }
-
-        .result-card h3 i {
-            margin-right: 10px;
-            color: #667eea;
-        }
-
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding: 12px;
-            text-align: right;
-            border-bottom: 1px solid #eee;
-        }
-
-        .data-table th {
             background: #f8f9fa;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .data-table td {
-            font-family: 'Courier New', monospace;
-            font-weight: 500;
-        }
-
-        .positive {
-            color: #28a745;
-        }
-
-        .negative {
-            color: #dc3545;
-        }
-
-        .summary-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             border-radius: 15px;
             padding: 30px;
             margin-top: 30px;
         }
 
-        .summary-section h2 {
+        .results-section h2 {
+            color: #2c3e50;
             margin-bottom: 20px;
-            font-size: 1.8em;
+            font-size: 1.5em;
         }
 
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .summary-item {
-            text-align: center;
-            padding: 20px;
-            background: rgba(255,255,255,0.1);
+        .result-item {
+            background: white;
             border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
         }
 
-        .summary-item h4 {
-            font-size: 0.9em;
-            opacity: 0.8;
+        .result-item h3 {
+            color: #2c3e50;
             margin-bottom: 10px;
         }
 
-        .summary-item .value {
-            font-size: 1.5em;
+        .result-value {
+            font-size: 1.2em;
             font-weight: 600;
+            color: #667eea;
         }
 
         .loading {
@@ -360,36 +294,45 @@ function formatear_numero($numero, $decimales = 2) {
             padding: 40px;
         }
 
-        .loading.show {
-            display: block;
+        .loading img {
+            width: 100px;
+            height: 100px;
         }
 
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .loading p {
+            margin-top: 20px;
+            color: #666;
+            font-size: 1.1em;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
         }
 
         @media (max-width: 768px) {
-            .content {
-                padding: 20px;
-            }
-            
             .file-inputs {
                 grid-template-columns: 1fr;
             }
             
-            .results-grid {
-                grid-template-columns: 1fr;
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
             }
         }
     </style>
@@ -398,191 +341,98 @@ function formatear_numero($numero, $decimales = 2) {
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-chart-line"></i> Procesador Completo de Balance</h1>
-            <p>Grupo Planeta - Análisis Financiero Integrado</p>
+            <p>Sistema de Análisis Financiero - Grupo Planeta</p>
+            <div class="system-info">
+                <strong>Versión:</strong> <?php echo SYSTEM_VERSION; ?> | 
+                <strong>Python:</strong> <?php echo $system_info['python_version']; ?> |
+                <strong>Estado:</strong> <?php echo empty($errores_sistema) ? '<span style="color: #28a745;">✓ Operativo</span>' : '<span style="color: #dc3545;">✗ Con errores</span>'; ?>
+            </div>
         </div>
 
         <div class="content">
-            <div class="upload-section">
-                <h2><i class="fas fa-upload"></i> Subir Archivos</h2>
-                
-                <?php if ($mensaje): ?>
-                    <div class="message <?= strpos($mensaje, 'Error') !== false ? 'error' : 'success' ?>">
-                        <?= htmlspecialchars($mensaje) ?>
+            <a href="dashboard.php" class="back-btn">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+
+            <?php if (!empty($errores_sistema)): ?>
+                <div class="message error">
+                    <strong>Errores de configuración:</strong><br>
+                    <?php echo implode('<br>', $errores_sistema); ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($mensaje)): ?>
+                <div class="message <?php echo strpos($mensaje, 'Error') === 0 ? 'error' : 'success'; ?>">
+                    <?php echo $mensaje; ?>
                     </div>
                 <?php endif; ?>
 
+            <div class="upload-section">
+                <h2><i class="fas fa-upload"></i> Subir Archivos</h2>
                 <form method="POST" enctype="multipart/form-data" id="uploadForm">
                     <div class="file-inputs">
                         <div class="file-input-group">
                             <label for="balance">
-                                <i class="fas fa-file-excel"></i> Archivo BALANCE
+                                <i class="fas fa-file-excel"></i> Archivo de Balance
                             </label>
-                            <input type="file" name="balance" id="balance" accept=".xlsx,.xls" required>
-                            <small>Archivo Excel con datos de balance</small>
+                            <input type="file" id="balance" name="balance" accept=".xlsx,.xls" required>
                         </div>
 
                         <div class="file-input-group">
                             <label for="situacion">
-                                <i class="fas fa-file-excel"></i> Archivo SITUACIÓN
+                                <i class="fas fa-file-excel"></i> Archivo de Situación
                             </label>
-                            <input type="file" name="situacion" id="situacion" accept=".xlsx,.xls" required>
-                            <small>Archivo Excel con datos de situación</small>
+                            <input type="file" id="situacion" name="situacion" accept=".xlsx,.xls" required>
                         </div>
 
                         <div class="file-input-group">
                             <label for="focus">
-                                <i class="fas fa-file-excel"></i> Archivo FOCUS
+                                <i class="fas fa-file-excel"></i> Archivo de Focus
                             </label>
-                            <input type="file" name="focus" id="focus" accept=".xlsx,.xls" required>
-                            <small>Archivo Excel con datos de focus</small>
+                            <input type="file" id="focus" name="focus" accept=".xlsx,.xls" required>
                         </div>
                     </div>
 
                     <button type="submit" class="submit-btn" id="submitBtn">
-                        <i class="fas fa-cogs"></i> Procesar Archivos
+                        <i class="fas fa-play"></i> Procesar Archivos
                     </button>
                 </form>
             </div>
 
             <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>Procesando archivos... Por favor espere.</p>
+                <img src="planetacargando.gif" alt="Procesando...">
+                <p>Procesando archivos, por favor espere...</p>
             </div>
 
             <?php if ($resultados): ?>
-            <div class="results-section show" id="resultsSection">
+                <div class="results-section">
                 <h2><i class="fas fa-chart-bar"></i> Resultados del Procesamiento</h2>
                 
-                <div class="results-grid">
-                    <div class="result-card">
-                        <h3><i class="fas fa-calculator"></i> Resumen de Cálculos</h3>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Concepto</th>
-                                    <th>Vencida</th>
-                                    <th>No Vencida</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($resultados['reporte_final']['resumen_calculos'] as $concepto => $valores): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($concepto) ?></td>
-                                    <td class="<?= $valores['vencida'] >= 0 ? 'positive' : 'negative' ?>">
-                                        <?= formatear_numero($valores['vencida']) ?>
-                                    </td>
-                                    <td class="<?= $valores['no_vencida'] >= 0 ? 'positive' : 'negative' ?>">
-                                        <?= formatear_numero($valores['no_vencida']) ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                    <?php if (isset($resultados['archivos_procesados'])): ?>
+                        <div class="result-item">
+                            <h3>Archivos Procesados</h3>
+                            <p><?php echo implode(', ', $resultados['archivos_procesados']); ?></p>
                     </div>
-
-                    <div class="result-card">
-                        <h3><i class="fas fa-coins"></i> Provisión y Dotación</h3>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Concepto</th>
-                                    <th>Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($resultados['reporte_final']['provision_dotacion'] as $concepto => $valor): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($concepto) ?></td>
-                                    <td class="<?= $valor >= 0 ? 'positive' : 'negative' ?>">
-                                        <?= $valor !== '' ? formatear_numero($valor) : '-' ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                    <?php endif; ?>
+                    
+                    <?php if (isset($resultados['estadisticas'])): ?>
+                        <div class="result-item">
+                            <h3>Estadísticas</h3>
+                            <p><strong>Registros procesados:</strong> <?php echo $resultados['estadisticas']['total_registros'] ?? 'N/A'; ?></p>
+                            <p><strong>Tiempo de procesamiento:</strong> <?php echo $resultados['estadisticas']['tiempo_procesamiento'] ?? 'N/A'; ?> segundos</p>
                     </div>
-
-                    <div class="result-card">
-                        <h3><i class="fas fa-chart-area"></i> Acumulado</h3>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Concepto</th>
-                                    <th>Vencida</th>
-                                    <th>No Vencida</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($resultados['reporte_final']['acumulado'] as $concepto => $valores): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($concepto) ?></td>
-                                    <td class="<?= $valores['vencida'] >= 0 ? 'positive' : 'negative' ?>">
-                                        <?= formatear_numero($valores['vencida']) ?>
-                                    </td>
-                                    <td class="<?= $valores['no_vencida'] >= 0 ? 'positive' : 'negative' ?>">
-                                        <?= formatear_numero($valores['no_vencida']) ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                    <?php endif; ?>
+                    
+                    <?php if (isset($resultados['archivo_resultado'])): ?>
+                        <div class="result-item">
+                            <h3>Archivo de Resultado</h3>
+                            <p><strong>Ruta:</strong> <?php echo $resultados['archivo_resultado']; ?></p>
+                            <a href="descargar_resultado.php?archivo=<?php echo urlencode($resultados['archivo_resultado']); ?>" 
+                               class="submit-btn" style="text-decoration: none; display: inline-block; margin-top: 10px;">
+                                <i class="fas fa-download"></i> Descargar Resultado
+                            </a>
                     </div>
-
-                    <div class="result-card">
-                        <h3><i class="fas fa-balance-scale"></i> Deuda Final</h3>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Concepto</th>
-                                    <th>Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($resultados['reporte_final']['deuda_final'] as $concepto => $valor): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($concepto) ?></td>
-                                    <td class="<?= $valor >= 0 ? 'positive' : 'negative' ?>">
-                                        <?= formatear_numero($valor) ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="summary-section">
-                    <h2><i class="fas fa-chart-pie"></i> Resumen Ejecutivo</h2>
-                    <div class="summary-grid">
-                        <div class="summary-item">
-                            <h4>Total Cobros</h4>
-                            <div class="value">
-                                <?= formatear_numero($resultados['reporte_final']['resumen_calculos']['- Cobros']['vencida'] + 
-                                                   $resultados['reporte_final']['resumen_calculos']['- Cobros']['no_vencida']) ?>
-                            </div>
-                        </div>
-                        <div class="summary-item">
-                            <h4>Total Facturación</h4>
-                            <div class="value">
-                                <?= formatear_numero($resultados['reporte_final']['resumen_calculos']['+ Facturación']['vencida'] + 
-                                                   $resultados['reporte_final']['resumen_calculos']['+ Facturación']['no_vencida']) ?>
-                            </div>
-                        </div>
-                        <div class="summary-item">
-                            <h4>Total Vencidos</h4>
-                            <div class="value">
-                                <?= formatear_numero($resultados['reporte_final']['resumen_calculos']['+/- Vencidos']['vencida'] + 
-                                                   $resultados['reporte_final']['resumen_calculos']['+/- Vencidos']['no_vencida']) ?>
-                            </div>
-                        </div>
-                        <div class="summary-item">
-                            <h4>Deuda Final</h4>
-                            <div class="value">
-                                <?= formatear_numero($resultados['reporte_final']['deuda_final']['deuda_bruta_no_grupo_final']) ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
@@ -590,15 +440,10 @@ function formatear_numero($numero, $decimales = 2) {
 
     <script>
         document.getElementById('uploadForm').addEventListener('submit', function() {
-            document.getElementById('loading').classList.add('show');
+            document.getElementById('loading').style.display = 'block';
             document.getElementById('submitBtn').disabled = true;
             document.getElementById('submitBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
         });
-
-        // Mostrar/ocultar resultados
-        <?php if ($resultados): ?>
-        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
-        <?php endif; ?>
     </script>
 </body>
 </html> 

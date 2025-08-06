@@ -13,3 +13,75 @@ programa o archivo por lotes ejecutable.
 Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:176
 Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_anticipos.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/anticipos_...')
 #1 {main}
+[2025-08-06 13:27:51] [ERROR] Error en script Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+[2025-08-06 13:27:51] [ERROR] Error en procesamiento de anticipos: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Excepción: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:176
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_anticipos.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/anticipos_...')
+#1 {main}
+[2025-08-06 13:29:24] [ERROR] Error en script Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+[2025-08-06 13:29:24] [ERROR] Error en procesamiento de anticipos: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Excepción: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:176
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_anticipos.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/anticipos_...')
+#1 {main}
+[2025-08-06 13:29:36] [ERROR] Error en script Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+[2025-08-06 13:29:36] [ERROR] Error en procesamiento de anticipos: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Excepción: Error al procesar el archivo con Python: "python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+"python" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:176
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_anticipos.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/anticipos_...')
+#1 {main}
+[2025-08-06 13:32:39] [ERROR] Error en procesamiento de cartera: El script de Python no existe: PROVCA/procesador_cartera.py
+Excepción: El script de Python no existe: PROVCA/procesador_cartera.py
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:182
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_cartera.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/cartera_20...')
+#1 {main}
+[2025-08-06 13:32:56] [ERROR] Error en procesamiento de balance: El script de Python no existe: PROVCA/procesador_balance_completo.py
+Excepción: El script de Python no existe: PROVCA/procesador_balance_completo.py
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:182
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_balance.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/balance_20...')
+#1 {main}
+[2025-08-06 13:34:06] [ERROR] Error en procesamiento de anticipos: El script de Python no existe: PROVCA/procesador_anticipos.py
+Excepción: El script de Python no existe: PROVCA/procesador_anticipos.py
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:182
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_anticipos.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/anticipos_...')
+#1 {main}
+[2025-08-06 13:56:12] [ERROR] Error al detectar Python: No se pudo encontrar Python en el sistema. Verifique que esté instalado y en el PATH.
+[2025-08-06 13:56:12] [ERROR] Error en procesamiento de cartera: No se pudo encontrar Python en el sistema. Verifique que esté instalado.
+Excepción: No se pudo encontrar Python en el sistema. Verifique que esté instalado.
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:210
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_cartera.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/cartera_20...')
+#1 {main}
+[2025-08-06 13:56:20] [ERROR] Error al detectar Python: No se pudo encontrar Python en el sistema. Verifique que esté instalado y en el PATH.
+[2025-08-06 13:56:20] [ERROR] Error en procesamiento de cartera: No se pudo encontrar Python en el sistema. Verifique que esté instalado.
+Excepción: No se pudo encontrar Python en el sistema. Verifique que esté instalado.
+Archivo: C:\wamp64\www\modelo-deuda-python\cartera\config.php:210
+Trace: #0 C:\wamp64\www\modelo-deuda-python\cartera\procesar_cartera.php(45): ejecutarScriptPython('PROVCA/procesad...', 'temp/cartera_20...')
+#1 {main}

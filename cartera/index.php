@@ -84,20 +84,24 @@ $problemasSistema = verificarSaludSistema();
 
         .upload-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2.5rem;
             margin-bottom: 2rem;
         }
 
         .upload-card {
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            border-radius: 15px;
-            padding: 2rem;
+            border-radius: 20px;
+            padding: 2.5rem;
             text-align: center;
             transition: all 0.3s ease;
             border: 2px solid transparent;
             position: relative;
             overflow: hidden;
+            min-height: 350px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .upload-card::before {
@@ -118,22 +122,22 @@ $problemasSistema = verificarSaludSistema();
         }
 
         .upload-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
             border-color: var(--primary-color);
         }
 
         .upload-icon {
-            font-size: 3rem;
+            font-size: 4rem;
             color: var(--primary-color);
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             position: relative;
             z-index: 2;
         }
 
         .upload-title {
-            font-size: 1.5rem;
-            font-weight: 600;
+            font-size: 1.8rem;
+            font-weight: 700;
             margin-bottom: 1rem;
             color: var(--text-primary);
             position: relative;
@@ -142,20 +146,25 @@ $problemasSistema = verificarSaludSistema();
 
         .upload-description {
             color: var(--text-secondary);
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
             line-height: 1.6;
             position: relative;
             z-index: 2;
+            font-size: 1.1rem;
         }
 
         .upload-form {
             position: relative;
             z-index: 2;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
         }
 
         .file-input-wrapper {
             position: relative;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .file-input {
@@ -164,41 +173,52 @@ $problemasSistema = verificarSaludSistema();
             width: 100%;
             height: 100%;
             cursor: pointer;
+            z-index: 10;
         }
 
         .file-input-label {
             display: block;
-            padding: 1rem 2rem;
+            padding: 1.2rem 2rem;
             background: var(--primary-color);
             color: white;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border: 2px solid transparent;
         }
 
         .file-input-label:hover {
             background: var(--primary-dark);
-            transform: translateY(-2px);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+
+        .file-input:focus + .file-input-label {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
         .file-info {
             display: none;
             margin-top: 1rem;
-            padding: 1rem;
+            padding: 1.2rem;
             background: var(--success-light);
-            border-radius: 8px;
+            border-radius: 10px;
             border-left: 4px solid var(--success-color);
+            animation: slideUp 0.3s ease;
         }
 
         .file-info.show {
             display: block;
-            animation: slideUp 0.3s ease;
         }
 
         .file-name {
             font-weight: 600;
-            color: var(--text-primary);
+            color: var(--success-color);
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
         }
 
         .file-size {
@@ -207,48 +227,55 @@ $problemasSistema = verificarSaludSistema();
         }
 
         .upload-btn {
+            width: 100%;
+            padding: 1.2rem 2rem;
             background: var(--success-color);
             color: white;
             border: none;
-            padding: 1rem 2rem;
-            border-radius: 10px;
+            border-radius: 12px;
             font-weight: 600;
+            font-size: 1.1rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            width: 100%;
-            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
 
-        .upload-btn:hover:not(:disabled) {
-            background: #059669;
+        .upload-btn:hover {
+            background: var(--success-dark);
             transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
         }
 
         .upload-btn:disabled {
-            opacity: 0.6;
+            background: var(--text-secondary);
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
-        .stats-section {
-            background: white;
-            border-radius: 20px;
-            padding: 2rem;
-            margin: 2rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
+        /* Estadísticas más pequeñas */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 2rem;
+            gap: 1.5rem;
+            margin-top: 2rem;
         }
 
         .stat-card {
-            text-align: center;
-            padding: 1.5rem;
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             border-radius: 15px;
-            border-left: 4px solid var(--primary-color);
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
 
         .stat-icon {
@@ -266,7 +293,7 @@ $problemasSistema = verificarSaludSistema();
 
         .stat-label {
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-weight: 500;
         }
 
         .notification {
@@ -356,6 +383,7 @@ $problemasSistema = verificarSaludSistema();
             transition: width 0.3s ease;
         }
 
+        /* Responsive */
         @media (max-width: 768px) {
             .hero-title {
                 font-size: 2rem;
@@ -368,10 +396,25 @@ $problemasSistema = verificarSaludSistema();
             
             .upload-grid {
                 grid-template-columns: 1fr;
+                gap: 2rem;
             }
-            
+
+            .upload-card {
+                padding: 2rem;
+                min-height: 300px;
+            }
+
+            .upload-icon {
+                font-size: 3rem;
+            }
+
+            .upload-title {
+                font-size: 1.5rem;
+            }
+
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
             }
         }
     </style>
@@ -434,9 +477,9 @@ $problemasSistema = verificarSaludSistema();
                 <p class="upload-description">
                     Procesamiento completo de formato deuda con provisión, anticipos, balance y focus
                 </p>
-                <form class="upload-form" action="procesar_formato_deuda.php" method="post" enctype="multipart/form-data">
+                <form class="upload-form" action="procesadores/procesar_formato_deuda.php" method="post" enctype="multipart/form-data">
                     <div class="file-input-wrapper">
-                        <input type="file" name="archivo" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <input type="file" name="archivo" id="file-input-1" class="file-input" accept=".xlsx,.xls,.csv" required>
                         <label for="file-input-1" class="file-input-label">
                             <i class="fas fa-cloud-upload-alt"></i>
                             Seleccionar Archivo
@@ -446,7 +489,7 @@ $problemasSistema = verificarSaludSistema();
                         <div class="file-name" id="file-name-1"></div>
                         <div class="file-size" id="file-size-1"></div>
                     </div>
-                    <button type="submit" class="upload-btn" id="upload-btn-1">
+                    <button type="submit" class="upload-btn" id="upload-btn-1" disabled>
                         <i class="fas fa-cogs"></i>
                         Procesar Formato Deuda
                     </button>
@@ -462,9 +505,9 @@ $problemasSistema = verificarSaludSistema();
                 <p class="upload-description">
                     Procesamiento de archivos de balance, situación y focus para análisis financiero
                 </p>
-                <form class="upload-form" action="procesar_balance.php" method="post" enctype="multipart/form-data">
+                <form class="upload-form" action="procesadores/procesar_balance.php" method="post" enctype="multipart/form-data">
                     <div class="file-input-wrapper">
-                        <input type="file" name="archivo" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <input type="file" name="archivo" id="file-input-2" class="file-input" accept=".xlsx,.xls,.csv" required>
                         <label for="file-input-2" class="file-input-label">
                             <i class="fas fa-cloud-upload-alt"></i>
                             Seleccionar Archivo
@@ -474,7 +517,7 @@ $problemasSistema = verificarSaludSistema();
                         <div class="file-name" id="file-name-2"></div>
                         <div class="file-size" id="file-size-2"></div>
                     </div>
-                    <button type="submit" class="upload-btn" id="upload-btn-2">
+                    <button type="submit" class="upload-btn" id="upload-btn-2" disabled>
                         <i class="fas fa-cogs"></i>
                         Procesar Balance
                     </button>
@@ -490,9 +533,9 @@ $problemasSistema = verificarSaludSistema();
                 <p class="upload-description">
                     Procesamiento de archivos de cartera con validaciones y formatos flexibles
                 </p>
-                <form class="upload-form" action="procesar_cartera.php" method="post" enctype="multipart/form-data">
+                <form class="upload-form" action="procesadores/procesar_cartera.php" method="post" enctype="multipart/form-data">
                     <div class="file-input-wrapper">
-                        <input type="file" name="archivo" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <input type="file" name="archivo" id="file-input-3" class="file-input" accept=".xlsx,.xls,.csv" required>
                         <label for="file-input-3" class="file-input-label">
                             <i class="fas fa-cloud-upload-alt"></i>
                             Seleccionar Archivo
@@ -502,7 +545,7 @@ $problemasSistema = verificarSaludSistema();
                         <div class="file-name" id="file-name-3"></div>
                         <div class="file-size" id="file-size-3"></div>
                     </div>
-                    <button type="submit" class="upload-btn" id="upload-btn-3">
+                    <button type="submit" class="upload-btn" id="upload-btn-3" disabled>
                         <i class="fas fa-cogs"></i>
                         Procesar Cartera
                     </button>
@@ -518,9 +561,9 @@ $problemasSistema = verificarSaludSistema();
                 <p class="upload-description">
                     Procesamiento de archivos de anticipos con análisis detallado
                 </p>
-                <form class="upload-form" action="procesar_anticipos.php" method="post" enctype="multipart/form-data">
+                <form class="upload-form" action="procesadores/procesar_anticipos.php" method="post" enctype="multipart/form-data">
                     <div class="file-input-wrapper">
-                        <input type="file" name="archivo" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <input type="file" name="archivo" id="file-input-4" class="file-input" accept=".xlsx,.xls,.csv" required>
                         <label for="file-input-4" class="file-input-label">
                             <i class="fas fa-cloud-upload-alt"></i>
                             Seleccionar Archivo
@@ -530,9 +573,93 @@ $problemasSistema = verificarSaludSistema();
                         <div class="file-name" id="file-name-4"></div>
                         <div class="file-size" id="file-size-4"></div>
                     </div>
-                    <button type="submit" class="upload-btn" id="upload-btn-4">
+                    <button type="submit" class="upload-btn" id="upload-btn-4" disabled>
                         <i class="fas fa-cogs"></i>
                         Procesar Anticipos
+                    </button>
+                </form>
+            </div>
+
+            <!-- Balance Específico -->
+            <div class="upload-card">
+                <div class="upload-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <h3 class="upload-title">Balance Específico</h3>
+                <p class="upload-description">
+                    Procesamiento específico de archivos de balance según reglas de negocio
+                </p>
+                <form class="upload-form" action="procesadores/procesar_balance_especifico.php" method="post" enctype="multipart/form-data">
+                    <div class="file-input-wrapper">
+                        <input type="file" name="archivo" id="file-input-5" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <label for="file-input-5" class="file-input-label">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Seleccionar Archivo
+                        </label>
+                    </div>
+                    <div class="file-info" id="file-info-5">
+                        <div class="file-name" id="file-name-5"></div>
+                        <div class="file-size" id="file-size-5"></div>
+                    </div>
+                    <button type="submit" class="upload-btn" id="upload-btn-5" disabled>
+                        <i class="fas fa-cogs"></i>
+                        Procesar Balance Específico
+                    </button>
+                </form>
+            </div>
+
+            <!-- Situación Específico -->
+            <div class="upload-card">
+                <div class="upload-icon">
+                    <i class="fas fa-chart-area"></i>
+                </div>
+                <h3 class="upload-title">Situación Específico</h3>
+                <p class="upload-description">
+                    Procesamiento específico de archivos de situación financiera
+                </p>
+                <form class="upload-form" action="procesadores/procesar_situacion_especifico.php" method="post" enctype="multipart/form-data">
+                    <div class="file-input-wrapper">
+                        <input type="file" name="archivo" id="file-input-6" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <label for="file-input-6" class="file-input-label">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Seleccionar Archivo
+                        </label>
+                    </div>
+                    <div class="file-info" id="file-info-6">
+                        <div class="file-name" id="file-name-6"></div>
+                        <div class="file-size" id="file-size-6"></div>
+                    </div>
+                    <button type="submit" class="upload-btn" id="upload-btn-6" disabled>
+                        <i class="fas fa-cogs"></i>
+                        Procesar Situación Específico
+                    </button>
+                </form>
+            </div>
+
+            <!-- Focus Específico -->
+            <div class="upload-card">
+                <div class="upload-icon">
+                    <i class="fas fa-bullseye"></i>
+                </div>
+                <h3 class="upload-title">Focus Específico</h3>
+                <p class="upload-description">
+                    Procesamiento específico de archivos de focus con análisis detallado
+                </p>
+                <form class="upload-form" action="procesadores/procesar_focus_especifico.php" method="post" enctype="multipart/form-data">
+                    <div class="file-input-wrapper">
+                        <input type="file" name="archivo" id="file-input-7" class="file-input" accept=".xlsx,.xls,.csv" required>
+                        <label for="file-input-7" class="file-input-label">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Seleccionar Archivo
+                        </label>
+                    </div>
+                    <div class="file-info" id="file-info-7">
+                        <div class="file-name" id="file-name-7"></div>
+                        <div class="file-size" id="file-size-7"></div>
+                    </div>
+                    <button type="submit" class="upload-btn" id="upload-btn-7" disabled>
+                        <i class="fas fa-cogs"></i>
+                        Procesar Focus Específico
                     </button>
                 </form>
             </div>
@@ -603,21 +730,21 @@ $problemasSistema = verificarSaludSistema();
             Accesos Rápidos
         </h2>
         <div class="stats-grid">
-            <a href="descargar_archivos.php" class="stat-card" style="text-decoration: none; color: inherit;">
+            <a href="utilidades/descargar_archivos.php" class="stat-card" style="text-decoration: none; color: inherit;">
                 <div class="stat-icon">
                     <i class="fas fa-download"></i>
                 </div>
                 <div class="stat-value">Descargar</div>
                 <div class="stat-label">Archivos</div>
             </a>
-            <a href="test_sistema.php" class="stat-card" style="text-decoration: none; color: inherit;" target="_blank">
+            <a href="utilidades/test_sistema.php" class="stat-card" style="text-decoration: none; color: inherit;" target="_blank">
                 <div class="stat-icon">
                     <i class="fas fa-tools"></i>
                 </div>
                 <div class="stat-value">Test</div>
                 <div class="stat-label">Sistema</div>
             </a>
-            <a href="ESTADO_FINAL_SISTEMA.md" class="stat-card" style="text-decoration: none; color: inherit;" target="_blank">
+            <a href="documentacion/ESTADO_FINAL_SISTEMA.md" class="stat-card" style="text-decoration: none; color: inherit;" target="_blank">
                 <div class="stat-icon">
                     <i class="fas fa-book"></i>
                 </div>
@@ -630,6 +757,13 @@ $problemasSistema = verificarSaludSistema();
                 </div>
                 <div class="stat-value">Ver</div>
                 <div class="stat-label">Logs</div>
+            </a>
+            <a href="utilidades/diagnostico_python.php" class="stat-card" style="text-decoration: none; color: inherit;">
+                <div class="stat-icon">
+                    <i class="fas fa-bug"></i>
+                </div>
+                <div class="stat-value">Diagnóstico</div>
+                <div class="stat-label">Python</div>
             </a>
         </div>
     </div>
@@ -649,11 +783,33 @@ $problemasSistema = verificarSaludSistema();
                     const fileInfo = document.getElementById(`file-info-${index + 1}`);
                     const fileName = document.getElementById(`file-name-${index + 1}`);
                     const fileSize = document.getElementById(`file-size-${index + 1}`);
+                    const label = input.nextElementSibling; // El label asociado
                     
                     fileName.textContent = file.name;
                     fileSize.textContent = formatFileSize(file.size);
                     fileInfo.classList.add('show');
+                    
+                    // Cambiar el texto del label para mostrar que se seleccionó un archivo
+                    label.innerHTML = '<i class="fas fa-check-circle"></i> Archivo Seleccionado';
+                    label.style.background = 'var(--success-color)';
+                    
+                    // Habilitar el botón de procesar
+                    const uploadBtn = input.closest('form').querySelector('.upload-btn');
+                    if (uploadBtn) {
+                        uploadBtn.disabled = false;
+                    }
                 }
+            });
+            
+            // Agregar evento click al label para mejor UX
+            const label = input.nextElementSibling;
+            label.addEventListener('click', function(e) {
+                // El click en el label ya activa el input automáticamente
+                // Solo agregamos un efecto visual
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 150);
             });
         });
 
@@ -661,6 +817,13 @@ $problemasSistema = verificarSaludSistema();
         document.querySelectorAll('.upload-form').forEach((form, index) => {
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                
+                // Validar que se haya seleccionado un archivo
+                const fileInput = form.querySelector('input[type="file"]');
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    showNotification('Seleccione un archivo.', 'error');
+                    return;
+                }
                 
                 const formData = new FormData(form);
                 const loading = document.getElementById('loading');
@@ -710,6 +873,16 @@ $problemasSistema = verificarSaludSistema();
                             form.reset();
                             document.getElementById(`file-info-${index + 1}`).classList.remove('show');
                             
+                            // Resetear el label y botón
+                            const label = form.querySelector('.file-input-label');
+                            label.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Seleccionar Archivo';
+                            label.style.background = 'var(--primary-color)';
+                            
+                            const uploadBtn = form.querySelector('.upload-btn');
+                            if (uploadBtn) {
+                                uploadBtn.disabled = true;
+                            }
+                            
                             // Actualizar estadísticas si están disponibles
                             if (responseData.data) {
                                 actualizarEstadisticas();
@@ -718,7 +891,7 @@ $problemasSistema = verificarSaludSistema();
                             // Mostrar botón para descargar archivos
                             setTimeout(() => {
                                 if (confirm('¿Deseas descargar los archivos generados?')) {
-                                    window.location.href = 'descargar_archivos.php';
+                                    window.location.href = 'utilidades/descargar_archivos.php';
                                 }
                             }, 2000);
                         } else {
@@ -734,6 +907,29 @@ $problemasSistema = verificarSaludSistema();
                 });
             });
         });
+
+        // Función para validar archivo en el cliente
+        function validarArchivoCliente(file) {
+            const allowedTypes = ['.xlsx', '.xls', '.csv'];
+            const maxSize = 50 * 1024 * 1024; // 50MB
+            
+            // Validar extensión
+            const fileName = file.name.toLowerCase();
+            const isValidType = allowedTypes.some(type => fileName.endsWith(type));
+            
+            if (!isValidType) {
+                showNotification('Tipo de archivo no válido. Solo se permiten archivos .xlsx, .xls y .csv', 'error');
+                return false;
+            }
+            
+            // Validar tamaño
+            if (file.size > maxSize) {
+                showNotification('El archivo es demasiado grande. Máximo 50MB', 'error');
+                return false;
+            }
+            
+            return true;
+        }
 
         // Función para formatear tamaño de archivo
         function formatFileSize(bytes) {

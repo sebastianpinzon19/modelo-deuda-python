@@ -32,6 +32,56 @@ import os
 import sys
 import locale
 import warnings
+import re
+
+def convertir_valor(valor_str):
+    try:
+        if valor_str is None:
+            return 0.0
+        if isinstance(valor_str, (int, float)):
+            return float(valor_str)
+
+        s = str(valor_str).strip().replace('\u200b', '').replace(' ', '')
+        if s == '' or s.lower() == 'nan':
+            return 0.0
+
+        if s.count('.') > 1 and s.count(',') > 1:
+            numeros = re.findall(r'\d+', s)
+            if numeros:
+                if len(numeros) >= 2:
+                    parte_entera = numeros[0]
+                    parte_decimal = numeros[1][:2] if len(numeros[1]) >= 2 else numeros[1]
+                    s = f"{parte_entera}.{parte_decimal}"
+                else:
+                    s = numeros[0]
+        elif s.count('.') > 1:
+            partes = s.split('.')
+            if len(partes) > 2:
+                s = ''.join(partes[:-1]) + '.' + partes[-1]
+        elif s.count(',') > 1:
+            partes = s.split(',')
+            if len(partes) > 2:
+                s = ''.join(partes[:-1]) + '.' + partes[-1]
+
+        if '.' in s and ',' in s:
+            s = s.replace('.', '').replace(',', '.')
+        elif ',' in s and '.' not in s:
+            partes = s.split(',')
+            if len(partes) == 2 and len(partes[1]) == 3:
+                s = s.replace(',', '.')
+            else:
+                s = s.replace(',', '.')
+
+        resultado = float(s)
+        if pd.isna(resultado) or resultado in (float('inf'), float('-inf')):
+            return 0.0
+
+        return resultado
+    except Exception as e:
+        print(f"Error convirtiendo valor: {valor_str}, Error: {e}")
+        return 0.0
+
+
 warnings.filterwarnings('ignore')
 
 # Mapeo oficial de columnas según especificaciones
@@ -250,7 +300,7 @@ def calcular_saldos_y_dotacion(df):
     if 'SALDO' in df.columns and 'DIAS VENCIDO' in df.columns:
         # Saldo vencido
         df['SALDO VENCIDO'] = df.apply(
-            lambda row: float(str(row['SALDO']).replace(',','').replace('$','')) if row['DIAS VENCIDO'] > 0 else 0, axis=1
+            lambda row: convertir_valor(row['SALDO']) if row['DIAS VENCIDO'] > 0 else 0, axis=1
         )
         
         # % Dotación (100% si días vencidos >= 180)
@@ -258,7 +308,7 @@ def calcular_saldos_y_dotacion(df):
         
         # Valor Dotación (saldo si días vencidos >= 180)
         df['  Valor Dotación  '] = df.apply(
-            lambda row: float(str(row['SALDO']).replace(',','').replace('$','')) if row['DIAS VENCIDO'] >= 180 else 0, axis=1
+            lambda row: convertir_valor(row['SALDO']) if row['DIAS VENCIDO'] >= 180 else 0, axis=1
         )
         
         # Mora Total (igual al saldo vencido)
@@ -266,12 +316,13 @@ def calcular_saldos_y_dotacion(df):
         
         # Valor Total Por Vencer
         df['Valor Total Por Vencer'] = df.apply(
-            lambda row: float(str(row['SALDO']).replace(',','').replace('$','')) if row['DIAS VENCIDO'] <= 0 else 0, axis=1
+            lambda row: convertir_valor(row['SALDO']) if row['DIAS VENCIDO'] <= 0 else 0, axis=1
         )
         
         print("Saldos y dotación calculados correctamente")
     
     return df
+
 
 def calcular_vencimientos_historicos(df, fecha_cierre_str=None):
     """Calcula vencimientos históricos de los últimos 6 meses"""
@@ -298,7 +349,7 @@ def calcular_vencimientos_historicos(df, fecha_cierre_str=None):
             nombre_mes = inicio_mes.strftime('%b-%y').lower()
             
             df[nombre_mes] = df.apply(
-                lambda row: float(str(row['SALDO']).replace(',','').replace('$',''))
+                lambda row: convertir_valor(row['SALDO'])
                 if (row['FECHA VTO_DT'] and inicio_mes <= row['FECHA VTO_DT'] < fin_mes) 
                 else '-', axis=1
             )
@@ -314,7 +365,7 @@ def calcular_vencimientos_por_rango(df):
     if 'SALDO' in df.columns and 'DIAS VENCIDO' in df.columns:
         for nombre_col, min_dias, max_dias in VENCIMIENTOS_RANGOS:
             df[nombre_col] = df.apply(
-                lambda row: float(str(row['SALDO']).replace(',','').replace('$',''))
+                lambda row: convertir_valor(row['SALDO'])
                 if min_dias <= row['DIAS VENCIDO'] <= max_dias 
                 else 0, axis=1
             )
@@ -336,7 +387,7 @@ def calcular_por_vencer(df, fecha_cierre_str=None):
             fin_mes = fecha_cierre + pd.DateOffset(months=i)
             
             df[f'Por_Vencer_{i}_meses'] = df.apply(
-                lambda row: float(str(row['SALDO']).replace(',','').replace('$',''))
+                lambda row: convertir_valor(row['SALDO'])
                 if (row['FECHA VTO_DT'] and inicio_mes <= row['FECHA VTO_DT'] < fin_mes) 
                 else 0, axis=1
             )
@@ -344,7 +395,7 @@ def calcular_por_vencer(df, fecha_cierre_str=None):
         # Mayor a 90 días
         fecha_90_dias = fecha_cierre + pd.DateOffset(days=90)
         df['Por_Vencer_+90_dias'] = df.apply(
-            lambda row: float(str(row['SALDO']).replace(',','').replace('$',''))
+            lambda row: convertir_valor(row['SALDO'])
             if (row['FECHA VTO_DT'] and row['FECHA VTO_DT'] >= fecha_90_dias) 
             else 0, axis=1
         )
@@ -362,7 +413,7 @@ def validar_saldos(df):
     # Validar que Mora Total + Valor Total Por Vencer = Saldo
     if all(col in df.columns for col in ['Mora Total', 'Valor Total Por Vencer', 'SALDO']):
         df['Verificación Suma Saldos'] = df.apply(
-            lambda row: 'OK' if abs(row['Mora Total'] + row['Valor Total Por Vencer'] - float(str(row['SALDO']).replace(',','').replace('$',''))) < 0.01
+            lambda row: 'OK' if abs(row['Mora Total'] + row['Valor Total Por Vencer'] - convertir_valor(row['SALDO'])) < 0.01
             else 'ERROR', axis=1
         )
         
@@ -375,7 +426,7 @@ def validar_saldos(df):
     columnas_vencimiento = [col for col, _, _ in VENCIMIENTOS_RANGOS]
     if all(col in df.columns for col in columnas_vencimiento) and 'SALDO' in df.columns:
         df['Validación Vencimientos'] = df.apply(
-            lambda row: 'OK' if abs(sum([row[col] for col in columnas_vencimiento]) - float(str(row['SALDO']).replace(',','').replace('$',''))) < 0.01
+                lambda row: 'OK' if abs(sum([row[col] for col in columnas_vencimiento]) - convertir_valor(row['SALDO'])) < 0.01
             else 'ERROR', axis=1
         )
         
@@ -448,23 +499,23 @@ def aplicar_formato_final(df):
 
 def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
     """
-    Procesa el archivo de cartera según las especificaciones del formato de deuda
+    Procesa el archivo de cartera según las especificaciones del formato de deuda.
     """
     print("=" * 80)
     print("PROCESADOR DE CARTERA - FORMATO DEUDA")
     print("=" * 80)
-    
+
     if fecha_cierre_str:
         print(f"Fecha de cierre especificada: {fecha_cierre_str}")
     else:
         print("Usando fecha de cierre por defecto (último día del mes actual)")
-    
+
     try:
         # Leer archivo CSV
         print(f"Leyendo archivo: {input_path}")
-        df = pd.read_csv(input_path, sep=';', encoding='latin1', dtype=str)
+        df = pd.read_csv(input_path, sep=';', encoding='latin1', encoding_errors='strict', decimal=',', thousands='.', dtype=str)
         print(f"Archivo leído correctamente. Registros: {len(df)}")
-        
+
         # Procesar datos
         df = limpiar_y_validar_datos(df)
         df = unificar_nombres_clientes(df)
@@ -477,42 +528,41 @@ def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
         df = validar_saldos(df)
         df = crear_deuda_incobrable(df)
         df = aplicar_formato_final(df)
-        
+
         # Definir carpeta de salida
-        output_dir = r'C:\wamp64\www\cartera\PROVCA_PROCESADOS'
+        output_dir = r'C:\wamp64\www\modelo-deuda-python\CARTERA_V2.0.0\PROVCA_PROCESADOS'
         os.makedirs(output_dir, exist_ok=True)
-        
+
         if not output_path:
             ahora = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             output_path = os.path.join(output_dir, f'CARTERA_PROCESADA_{ahora}.xlsx')
-        
+
         # Verificar que el DataFrame no esté vacío
         if df.empty:
             print("ERROR: El DataFrame está vacío. No se puede generar archivo.")
             return None
-        
+
         # Guardar archivo Excel
         print(f"Guardando archivo: {output_path}")
         df.to_excel(output_path, index=False)
-        
+
         # Verificar que el archivo se creó correctamente
         if not os.path.exists(output_path):
             print("ERROR: No se pudo crear el archivo Excel.")
             return None
-        
         if os.path.getsize(output_path) == 0:
             print("ERROR: El archivo Excel está vacío.")
             os.remove(output_path)
             return None
-        
-        # Ajustar formato de Excel
+
+        # Ajustar formato de Excel con formato contable colombiano
         try:
             from openpyxl import load_workbook
             from openpyxl.styles import Alignment
             wb = load_workbook(output_path)
             ws = wb.active
-            
-            # Ajustar alineación: números a la derecha, texto al centro
+
+            # Ajustar alineación y formato monetario
             for row in ws.iter_rows(min_row=2):  # Saltar encabezados
                 for cell in row:
                     valor = cell.value
@@ -521,20 +571,21 @@ def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
                     else:
                         try:
                             # Si es número
-                            float(str(valor).replace('.','').replace(',','').replace('%',''))
+                            float(str(valor).replace('.', '').replace(',', '').replace('%', ''))
                             cell.alignment = Alignment(horizontal='right', vertical='center')
+                            cell.number_format = '"$"#,##0.00'  # Moneda COP
                         except:
                             cell.alignment = Alignment(horizontal='center', vertical='center')
-            
+
             # Encabezados al centro
             for cell in ws[1]:
                 cell.alignment = Alignment(horizontal='center', vertical='center')
-            
+
             wb.save(output_path)
-            print("Formato de Excel ajustado correctamente")
+            print("Formato de Excel ajustado correctamente con moneda COP")
         except Exception as e:
             print(f"Advertencia: No se pudo ajustar el formato de Excel: {e}")
-        
+
         # Resumen final
         print("\n" + "=" * 80)
         print("PROCESAMIENTO COMPLETADO EXITOSAMENTE")
@@ -543,7 +594,7 @@ def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
         print(f"Archivo generado: {output_path}")
         print(f"Registros procesados: {len(df)}")
         print(f"Columnas generadas: {len(df.columns)}")
-        
+
         # Mostrar columnas principales
         columnas_principales = [
             'EMPRESA', 'CODIGO CLIENTE', 'NOMBRE', 'DENOMINACION COMERCIAL',
@@ -551,23 +602,50 @@ def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
             '% Dotación', '  Valor Dotación  ', 'Mora Total', 'Valor Total Por Vencer'
         ]
         print(f"\nColumnas principales: {[col for col in columnas_principales if col in df.columns]}")
-        
+
         return output_path
-        
+
     except Exception as e:
         print(f"ERROR durante el procesamiento: {str(e)}")
         import traceback
         traceback.print_exc()
         return None
 
+
+def menu():
+    while True:
+        print("\n=== PROCESADOR DE CARTERA ===")
+        print("1. Procesar archivo CSV")
+        print("2. Salir")
+        opcion = input("Seleccione una opción: ")
+        
+        if opcion == "1":
+            ruta = input("Ruta del archivo CSV: ").strip()
+            fecha = input("Fecha de cierre (YYYY-MM-DD, opcional): ").strip() or None
+            salida = input("Ruta de salida (opcional): ").strip() or None
+            procesar_cartera(ruta, salida, fecha)
+        elif opcion == "2":
+            break
+        else:
+            print("Opción no válida.")
+
+
+def procesar_archivo(input_file, fecha_cierre=None, output_file=None):
+    """
+    Ejecuta el procesamiento sin menú, pensado para ser llamado desde PHP u otro sistema.
+    """
+    return procesar_cartera(input_file, output_file, fecha_cierre)
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         input_file = sys.argv[1]
         fecha_cierre = sys.argv[2] if len(sys.argv) > 2 else None
         output_file = sys.argv[3] if len(sys.argv) > 3 else None
-        procesar_cartera(input_file, output_file, fecha_cierre)
+        resultado = procesar_archivo(input_file, fecha_cierre, output_file)
+        if resultado:
+            print(f"Archivo procesado correctamente: {resultado}")
+        else:
+            print("Error procesando el archivo.")
     else:
-        print("Uso: python procesador_cartera.py <ruta_entrada_csv> [<fecha_cierre_YYYY-MM-DD>] [<ruta_salida_excel>]")
+        menu()
 
-def procesar_archivo():
-    return None

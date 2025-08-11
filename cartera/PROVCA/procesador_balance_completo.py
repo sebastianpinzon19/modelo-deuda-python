@@ -7,51 +7,42 @@ Sistema de Procesamiento de Cartera - Grupo Planeta
 
 import pandas as pd
 import numpy as np
-import os
 import sys
 from datetime import datetime
-import logging
-from utilidades_cartera import *
+from utilidades_cartera import UtilidadesCartera
 
 def procesar_balance_completo(ruta_archivo):
     """
-    Procesa archivo de balance completo
+    Procesa archivo de balance completo según reglas de negocio (solo cuentas y sumas requeridas).
     """
+    util = UtilidadesCartera()
     try:
-        logging.info(f"Iniciando procesamiento de balance completo: {ruta_archivo}")
-        
-        # Validar archivo
-        validar_archivo(ruta_archivo)
-        
-        # Leer archivo
-        df = leer_archivo(ruta_archivo)
-        logging.info(f"Archivo leído: {len(df)} registros")
-        
-        # Limpiar dataframe
-        df = limpiar_dataframe(df)
-        logging.info(f"Dataframe limpiado: {len(df)} registros")
-        
-        # Procesar datos
-        df_procesado = procesar_datos_balance(df)
-        
-        # Generar archivo de salida
-        nombre_salida = generar_nombre_archivo_salida("balance_completo_procesado")
-        ruta_salida = os.path.join("resultados", nombre_salida)
-        
-        # Crear directorio si no existe
-        crear_directorio_si_no_existe("resultados")
-        
+        util.validar_archivo(ruta_archivo)
+        df = util.leer_archivo(ruta_archivo)
+        df = util.limpiar_dataframe(df)
+        df.columns = df.columns.str.strip().str.upper()
+        # Filtrar cuentas requeridas y sumar columna 'SALDO AAF VARIACION'
+        cuentas_objeto = [
+            '43001', '0080.43002.20', '0080.43002.21', '0080.43002.15', '0080.43002.28',
+            '0080.43002.31', '0080.43002.63', '43008', '43042'
+        ]
+        col_cuenta = next((c for c in df.columns if 'CUENTA' in c), None)
+        col_saldo = next((c for c in df.columns if 'SALDO AAF VARIACION' in c), None)
+        if not col_cuenta or not col_saldo:
+            raise Exception('No se encontraron columnas de cuenta o saldo requeridas')
+        resumen = {}
+        for cuenta in cuentas_objeto:
+            mask = df[col_cuenta].astype(str).str.strip() == cuenta
+            total = df.loc[mask, col_saldo].sum()
+            resumen[cuenta] = total
+        df_resumen = pd.DataFrame(list(resumen.items()), columns=['CUENTA_OBJETO','TOTAL_SALDO_AAF_VARIACION'])
         # Guardar resultado
-        escribir_resultado(df_procesado, ruta_salida)
-        
-        # Crear resumen
-        resumen = crear_resumen_procesamiento(df, df_procesado, "Balance Completo")
-        
-        logging.info("Procesamiento de balance completo completado exitosamente")
+        nombre_salida = util.generar_nombre_archivo_salida("balance_completo_procesado")
+        ruta_salida = util.obtener_ruta_resultado(nombre_salida)
+        util.escribir_resultado(df_resumen, ruta_salida)
         return ruta_salida, resumen
-        
     except Exception as e:
-        logging.error(f"Error en procesamiento de balance completo: {e}")
+        print(f"Error en procesamiento de balance completo: {e}")
         raise
 
 def procesar_datos_balance(df):
@@ -60,42 +51,42 @@ def procesar_datos_balance(df):
     """
     # Copiar dataframe original
     df_procesado = df.copy()
-    
-    # Normalizar nombres de columnas
     df_procesado.columns = df_procesado.columns.str.strip().str.upper()
-    
-    # Procesar columnas de texto
+    # Limpiar texto
     columnas_texto = df_procesado.select_dtypes(include=['object']).columns
     for columna in columnas_texto:
         df_procesado[columna] = df_procesado[columna].apply(limpiar_texto)
     
-    # Procesar columnas numéricas
-    columnas_numericas = df_procesado.select_dtypes(include=[np.number]).columns
-    for columna in columnas_numericas:
-        df_procesado[columna] = pd.to_numeric(df_procesado[columna], errors='coerce')
-    
-    # Procesar fechas
-    columnas_fecha = []
+    def limpiar_texto(valor):
+        """
+        Limpia y normaliza texto eliminando espacios y convirtiendo a mayúsculas.
+        """
+        if pd.isna(valor):
+            return valor
+        return str(valor).strip().upper()
+    # Convertir numéricos
     for columna in df_procesado.columns:
-        if any(palabra in columna.upper() for palabra in ['FECHA', 'DATE', 'FECHA_', 'DATE_']):
-            columnas_fecha.append(columna)
-    
-    for columna in columnas_fecha:
-        df_procesado[columna] = df_procesado[columna].apply(convertir_fecha)
-    
-    # Agregar columnas calculadas específicas de balance
-    df_procesado = agregar_columnas_balance(df_procesado)
-    
-    # Ordenar por columnas relevantes
-    columnas_orden = []
-    for columna in ['CUENTA', 'FECHA', 'SALDO', 'ACTIVO', 'PASIVO']:
-        if columna in df_procesado.columns:
-            columnas_orden.append(columna)
-    
-    if columnas_orden:
-        df_procesado = df_procesado.sort_values(columnas_orden)
-    
-    return df_procesado
+        df_procesado[columna] = pd.to_numeric(df_procesado[columna], errors='ignore')
+    # Filtrar cuentas requeridas
+    cuentas_objeto = [
+        '43001', '0080.43002.20', '0080.43002.21', '0080.43002.15', '0080.43002.28',
+        '0080.43002.31', '0080.43002.63', '43008', '43042'
+    ]
+    # Buscar columna de cuenta y saldo
+    col_cuenta = next((c for c in df_procesado.columns if 'CUENTA' in c), None)
+    col_saldo = next((c for c in df_procesado.columns if 'SALDO AAF VARIACION' in c), None)
+    if not col_cuenta or not col_saldo:
+        raise Exception('No se encontraron columnas de cuenta o saldo requeridas')
+    # Filtrar y sumar
+    resumen = {}
+    for cuenta in cuentas_objeto:
+        mask = df_procesado[col_cuenta].astype(str).str.strip() == cuenta
+        total = df_procesado.loc[mask, col_saldo].sum()
+        resumen[cuenta] = total
+    # Crear dataframe resumen
+    df_resumen = pd.DataFrame(list(resumen.items()), columns=['CUENTA_OBJETO','TOTAL_SALDO_AAF_VARIACION'])
+    # Estructura de salida
+    return df_resumen
 
 def agregar_columnas_balance(df):
     """
@@ -226,25 +217,24 @@ def crear_analisis_balance(df):
     
     return analisis
 
-def main():
-    """
-    Función principal
-    """
-    if len(sys.argv) != 2:
-        print("Uso: python procesador_balance_completo.py <ruta_archivo>")
-        sys.exit(1)
-    
-    ruta_archivo = sys.argv[1]
-    
-    try:
-        ruta_salida, resumen = procesar_balance_completo(ruta_archivo)
-        print(f"Procesamiento completado exitosamente")
-        print(f"Archivo de salida: {ruta_salida}")
-        print(f"Resumen: {resumen}")
-        
-    except Exception as e:
-        print(f"Error en procesamiento: {e}")
-        sys.exit(1)
+def menu():
+    print("\n=== Procesador de Balance Completo ===")
+    print("1. Procesar archivo de balance completo")
+    print("0. Salir")
+    while True:
+        opcion = input("Seleccione una opción: ")
+        if opcion == "1":
+            ruta = input("Ingrese la ruta del archivo de balance: ")
+            try:
+                ruta_salida, resumen = procesar_balance_completo(ruta)
+                print(f"Procesamiento completado exitosamente\nArchivo de salida: {ruta_salida}\nResumen: {resumen}")
+            except Exception as e:
+                print(f"Error: {e}")
+        elif opcion == "0":
+            print("Saliendo...")
+            break
+        else:
+            print("Opción no válida.")
 
 if __name__ == "__main__":
-    main() 
+    menu()

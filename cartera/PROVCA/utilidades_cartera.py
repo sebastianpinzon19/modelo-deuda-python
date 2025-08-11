@@ -48,7 +48,7 @@ class UtilidadesCartera:
         Returns:
             str: Texto limpio y normalizado
         """
-        if pd.isna(texto) or texto is None:
+        if texto is None:
             return ""
         
         texto_str = str(texto).strip()
@@ -75,33 +75,33 @@ class UtilidadesCartera:
         Returns:
             pd.Timestamp: Fecha convertida o None si no se puede convertir
         """
-        if pd.isna(fecha_str) or fecha_str is None:
-        return None
-    
-    try:
+        if fecha_str is None or (isinstance(fecha_str, float) and pd.isna(fecha_str)):
+            return None
+
+        try:
             # Si ya es un timestamp, retornarlo
             if isinstance(fecha_str, pd.Timestamp):
                 return fecha_str
-            
+
             # Convertir a string
             fecha_str = str(fecha_str).strip()
-            
+
             if not fecha_str:
                 return None
-            
-        # Intentar diferentes formatos de fecha
+
+            # Intentar diferentes formatos de fecha
             for formato in FORMATOS_FECHA:
-            try:
-                return pd.to_datetime(fecha_str, format=formato)
+                try:
+                    return pd.to_datetime(fecha_str, format=formato)
                 except (ValueError, TypeError):
-                continue
-        
+                    continue
+
             # Si no funciona con formatos específicos, usar pandas
             return pd.to_datetime(fecha_str, errors='coerce')
-            
+
         except Exception as e:
             self.logger.warning(f"No se pudo convertir fecha '{fecha_str}': {e}")
-        return None
+            return None
 
     @log_funcion
     def formatear_numero(self, valor: Union[float, int, str], 
@@ -118,10 +118,8 @@ class UtilidadesCartera:
         """
         if pd.isna(valor) or valor is None:
             return "0.00"
-    
-    try:
-        numero = float(valor)
-            
+        try:
+            numero = float(valor)
             if formato == 'moneda':
                 return f"${numero:,.2f}"
             elif formato == 'porcentaje':
@@ -129,10 +127,9 @@ class UtilidadesCartera:
             elif formato == 'numero':
                 return f"{numero:,.2f}"
             else:
-        return f"{numero:,.2f}"
-                
+                return f"{numero:,.2f}"
         except (ValueError, TypeError):
-        return "0.00"
+            return "0.00"
 
     @log_funcion
     def calcular_porcentaje(self, valor: float, total: float) -> float:
@@ -148,7 +145,7 @@ class UtilidadesCartera:
         """
         if total == 0 or pd.isna(total) or pd.isna(valor):
             return 0.0
-    return (valor / total) * 100
+        return (valor / total) * 100
 
     # =============================================================================
     # FUNCIONES DE VALIDACIÓN
@@ -173,12 +170,12 @@ class UtilidadesCartera:
         if not ruta_archivo:
             raise ValueError("Ruta de archivo no puede estar vacía")
         
-    if not os.path.exists(ruta_archivo):
-        raise FileNotFoundError(f"Archivo no encontrado: {ruta_archivo}")
-    
-    if not os.access(ruta_archivo, os.R_OK):
-        raise PermissionError(f"No se puede leer el archivo: {ruta_archivo}")
-    
+        if not os.path.exists(ruta_archivo):
+            raise FileNotFoundError(f"Archivo no encontrado: {ruta_archivo}")
+        
+        if not os.access(ruta_archivo, os.R_OK):
+            raise PermissionError(f"No se puede leer el archivo: {ruta_archivo}")
+        
         # Validar tamaño del archivo
         tamano_archivo = os.path.getsize(ruta_archivo)
         if tamano_archivo > VALIDACION_CONFIG['tamano_maximo_archivo']:
@@ -194,7 +191,7 @@ class UtilidadesCartera:
             raise ValueError(f"Extensión no soportada: {extension}")
         
         self.logger.info(f"Archivo validado correctamente: {ruta_archivo}")
-    return True
+        return True
 
     @log_funcion
     def obtener_extension(self, ruta_archivo: str) -> str:
@@ -207,7 +204,7 @@ class UtilidadesCartera:
         Returns:
             str: Extensión del archivo en minúsculas
         """
-    return os.path.splitext(ruta_archivo)[1].lower()
+        return os.path.splitext(ruta_archivo)[1].lower()
 
     @log_funcion
     def validar_columnas_requeridas(self, df: pd.DataFrame, 
@@ -225,16 +222,14 @@ class UtilidadesCartera:
         Raises:
             ValueError: Si faltan columnas requeridas
         """
-    columnas_faltantes = []
-    for columna in columnas_requeridas:
-        if columna not in df.columns:
-            columnas_faltantes.append(columna)
-    
-    if columnas_faltantes:
-        raise ValueError(f"Columnas faltantes: {', '.join(columnas_faltantes)}")
-    
+        columnas_faltantes = []
+        for columna in columnas_requeridas:
+            if columna not in df.columns:
+                columnas_faltantes.append(columna)
+        if columnas_faltantes:
+            raise ValueError(f"Columnas faltantes: {', '.join(columnas_faltantes)}")
         self.logger.info(f"Columnas requeridas validadas: {len(columnas_requeridas)} columnas")
-    return True
+        return True
 
     # =============================================================================
     # FUNCIONES DE ARCHIVOS Y DIRECTORIOS
@@ -335,42 +330,34 @@ class UtilidadesCartera:
                 encoding=EXCEL_CONFIG['encoding']
             )
             self.logger.info(f"Archivo Excel leído: {ruta_archivo} - {len(df)} registros")
-        return df
-            
-    except Exception as e:
+            return df
+        except Exception as e:
             self.logger.error(f"Error al leer Excel {ruta_archivo}: {e}")
-        raise
+            raise
 
     @log_funcion
     def leer_archivo_csv(self, ruta_archivo: str, separador: str = None) -> pd.DataFrame:
         """
-        Lee archivo CSV con manejo de errores
-        
-        Args:
-            ruta_archivo: Ruta del archivo CSV
-            separador: Separador de campos
-            
-        Returns:
-            pd.DataFrame: Datos leídos del archivo
-            
-        Raises:
-            Exception: Si hay error al leer el archivo
+        Lee archivo CSV con manejo de errores y prueba varias codificaciones
         """
-        try:
-            if separador is None:
-                separador = CSV_CONFIG['separador']
-            
-            df = pd.read_csv(
-                ruta_archivo, 
-                sep=separador, 
-                encoding=CSV_CONFIG['encoding']
-            )
-            self.logger.info(f"Archivo CSV leído: {ruta_archivo} - {len(df)} registros")
-        return df
-            
-    except Exception as e:
-            self.logger.error(f"Error al leer CSV {ruta_archivo}: {e}")
-        raise
+        codificaciones = [CSV_CONFIG['encoding'], 'latin1', 'cp1252']
+        if separador is None:
+            separador = CSV_CONFIG['separador']
+        ultimo_error = None
+        for encoding in codificaciones:
+            try:
+                df = pd.read_csv(
+                    ruta_archivo,
+                    sep=separador,
+                    encoding=encoding
+                )
+                self.logger.info(f"Archivo CSV leído: {ruta_archivo} - {len(df)} registros - encoding usado: {encoding}")
+                return df
+            except Exception as e:
+                self.logger.warning(f"Fallo al leer CSV {ruta_archivo} con encoding {encoding}: {e}")
+                ultimo_error = e
+        self.logger.error(f"Error al leer CSV {ruta_archivo} con todas las codificaciones probadas. Último error: {ultimo_error}")
+        raise Exception(f"No se pudo leer el archivo CSV {ruta_archivo}. Último error: {ultimo_error}")
 
     @log_funcion
     def leer_archivo(self, ruta_archivo: str) -> pd.DataFrame:
@@ -387,13 +374,12 @@ class UtilidadesCartera:
             ValueError: Si el tipo de archivo no es soportado
         """
         extension = self.obtener_extension(ruta_archivo)
-        
         if extension in EXTENSIONES_SOPORTADAS['excel']:
             return self.leer_archivo_excel(ruta_archivo)
         elif extension in EXTENSIONES_SOPORTADAS['csv']:
             return self.leer_archivo_csv(ruta_archivo)
-    else:
-        raise ValueError(f"Tipo de archivo no soportado: {extension}")
+        else:
+            raise ValueError(f"Tipo de archivo no soportado: {extension}")
 
     # =============================================================================
     # FUNCIONES DE ESCRITURA DE ARCHIVOS
@@ -456,12 +442,12 @@ class UtilidadesCartera:
         Returns:
             Dict: Resumen del procesamiento
         """
-    resumen = {
-        'tipo_procesamiento': tipo_procesamiento,
+        resumen = {
+            'tipo_procesamiento': tipo_procesamiento,
             'fecha_procesamiento': obtener_fecha_actual(),
-        'registros_originales': len(datos_originales),
-        'registros_procesados': len(datos_procesados),
-        'columnas_originales': list(datos_originales.columns),
+            'registros_originales': len(datos_originales),
+            'registros_procesados': len(datos_procesados),
+            'columnas_originales': list(datos_originales.columns),
             'columnas_procesadas': list(datos_procesados.columns),
             'reduccion_registros': len(datos_originales) - len(datos_procesados),
             'porcentaje_reduccion': self.calcular_porcentaje(
@@ -469,9 +455,8 @@ class UtilidadesCartera:
                 len(datos_originales)
             )
         }
-        
         self.logger.info(f"Resumen creado: {resumen['registros_originales']} → {resumen['registros_procesados']} registros")
-    return resumen
+        return resumen
     
     @log_funcion
     def generar_estadisticas_dataframe(self, df: pd.DataFrame) -> Dict[str, Any]:

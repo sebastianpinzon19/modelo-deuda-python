@@ -2,6 +2,10 @@
 session_start();
 header('Content-Type: text/html; charset=utf-8');
 
+$scripts = [
+    'cartera' => __DIR__ . '/../PROVCA/procesador_cartera.py',
+    // ...
+];
 // Incluir configuración mejorada
 require_once 'configuracion.php';
 

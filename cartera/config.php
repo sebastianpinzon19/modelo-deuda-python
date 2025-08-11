@@ -92,7 +92,7 @@ define('ALLOWED_MIME_TYPES', [
 ]);
 
 // Configuración de notificaciones
-define('NOTIFICATION_DURATION', 5000); // 5 segundos
+define('NOTIFICATION_DURATION', 9000); // 9 segundos
 define('SHOW_PROGRESS', true);
 
 // Configuración de logs
@@ -100,7 +100,7 @@ define('LOG_ENABLED', true);
 define('LOG_FILE', DIR_LOGS . 'sistema.log');
 define('ERROR_LOG_FILE', DIR_LOGS . 'errores.log');
 
-// Configuración de limpieza automática
+// Configuración de limpieza automática 
 define('AUTO_CLEANUP_ENABLED', true);
 define('CLEANUP_LOG_FILE', DIR_LOGS . 'limpieza.log');
 

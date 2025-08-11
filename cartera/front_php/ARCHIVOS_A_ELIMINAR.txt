@@ -1,0 +1,16 @@
+# Archivos PHP a eliminar para optimizar el sistema y dejar solo lo esencial:
+
+# Puedes eliminar estos archivos si usas solo dashboard_phponly.php y procesar.php:
+procesar_cartera.php
+procesar_balance.php
+modelo_deuda.php
+api_procesamiento.php
+
+# Opcional (solo si no usas diagnóstico avanzado):
+estado_sistema.php
+
+# Los archivos que debes conservar:
+procesar.php
+configuracion.php
+descargar_resultado.php
+dashboard_phponly.php

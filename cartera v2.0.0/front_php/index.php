@@ -145,10 +145,6 @@
             background: linear-gradient(135deg, #f59e0b, #d97706);
         }
 
-        .sistema .button-icon {
-            background: linear-gradient(135deg, #6b7280, #4b5563);
-        }
-
         .button-content h3 {
             font-size: 1.5rem;
             font-weight: 700;
@@ -247,45 +243,55 @@
 
         <!-- Botones principales -->
         <div class="main-buttons">
-            <a href="procesar_cartera.php" class="main-button balance">
+            <a href="cartera.php" class="main-button cartera">
                 <div class="button-icon">
-                    <i class="fas fa-balance-scale"></i>
+                    <i class="fas fa-file-invoice-dollar"></i>
                 </div>
                 <div class="button-content">
-                    <h3>Procesador de Cartera</h3>
-                    <p>Análisis completo de balance, situación y focus</p>
+                    <h3>Cartera (Provisión)</h3>
+                    <p>Procesa archivos PROVCA.CSV</p>
                 </div>
             </a>
 
-            <a href="procesar_balance.php" class="main-button cartera">
+            <a href="anticipos.php" class="main-button anticipo">
                 <div class="button-icon">
-                    <i class="fas fa-chart-bar"></i>
+                    <i class="fas fa-hand-holding-usd"></i>
                 </div>
                 <div class="button-content">
-                    <h3>Procesador de Balance</h3>
-                    <p>Procesamiento específico de archivos de balance</p>
+                    <h3>Anticipos</h3>
+                    <p>Procesa archivos de anticipos</p>
                 </div>
             </a>
 
-            <a href="modelo_deuda.php" class="main-button modelo">
+            <a href="modelo.php" class="main-button modelo">
                 <div class="button-icon">
                     <i class="fas fa-calculator"></i>
                 </div>
                 <div class="button-content">
-                    <h3>Modelo de Deuda</h3>
-                    <p>Genera modelo de deuda y análisis financiero</p>
+                    <h3>Modelo Deuda</h3>
+                    <p>Genera modelo de deuda</p>
                 </div>
             </a>
 
-            <a href="estado_sistema.php" class="main-button sistema">
+            <a href="balance.php" class="main-button balance">
                 <div class="button-icon">
-                    <i class="fas fa-server"></i>
+                    <i class="fas fa-balance-scale"></i>
                 </div>
                 <div class="button-content">
-                    <h3>Estado del Sistema</h3>
-                    <p>Monitoreo y configuración del sistema</p>
+                    <h3>Procesador Balance</h3>
+                    <p>Análisis de cuentas y cálculos financieros</p>
                 </div>
             </a>
+            <a href="http://localhost/cartera%20v1.0.0/cartera/front_php/procesar_balance_completo.php" class="main-button balance">
+                <div class="button-icon">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <div class="button-content">
+                    <h3>Prueba Cartera 2</h3>
+                    <p>Más detalles sobre el sistema</p>
+                </div>
+            </a>
+            
         </div>
     </div>
 

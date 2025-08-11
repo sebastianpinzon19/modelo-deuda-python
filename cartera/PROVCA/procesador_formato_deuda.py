@@ -23,40 +23,106 @@ class ProcesadorFormatoDeuda:
         self.utilidades = UtilidadesCartera()
     
     @log_funcion
-    def procesar_formato_deuda(self, ruta_archivo: str) -> Tuple[str, Dict[str, Any]]:
+    def procesar_formato_deuda(self, ruta_archivo: str, anticipos_path: str = None, trm: float = 1.0) -> Tuple[str, Dict[str, Any]]:
         """
-        Procesa archivo de formato deuda (procesador principal)
+        Procesa archivo de formato deuda (procesador principal) según reglas de negocio.
         """
         try:
             self.logger.info(f"Iniciando procesamiento de formato deuda: {ruta_archivo}")
-            
-            # Validar archivo
             self.utilidades.validar_archivo(ruta_archivo)
-            
-            # Leer archivo
             df = self.utilidades.leer_archivo(ruta_archivo)
-            self.logger.info(f"Archivo leído: {len(df)} registros")
-            
-            # Limpiar dataframe
             df = self.utilidades.limpiar_dataframe(df)
-            self.logger.info(f"Dataframe limpiado: {len(df)} registros")
-            
-            # Procesar datos
-            df_procesado = self.procesar_datos_formato_deuda(df)
-            
-            # Generar archivo de salida
+            df.columns = df.columns.str.strip().str.upper()
+
+            # Filtrar líneas en pesos y divisas
+            lineas_pesos = [
+                ("CT", 80), ("ED", 41), ("ED", 44), ("ED", 47), ("PL", 10), ("PL", 15), ("PL", 20), ("PL", 21),
+                ("PL", 23), ("PL", 25), ("PL", 28), ("PL", 29), ("PL", 31), ("PL", 32), ("PL", 53), ("PL", 56),
+                ("PL", 60), ("PL", 62), ("PL", 63), ("PL", 64), ("PL", 65), ("PL", 66), ("PL", 69)
+            ]
+            lineas_divisas = [
+                ("PL", 11), ("PL", 18), ("PL", 57), ("PL", 41)
+            ]
+            df_pesos = df[df.apply(lambda x: (x.get("CODIGO","").strip(), int(x.get("EMPRESA",0))) in lineas_pesos, axis=1)].copy()
+            df_divisas = df[df.apply(lambda x: (x.get("CODIGO","").strip(), int(x.get("EMPRESA",0))) in lineas_divisas, axis=1)].copy()
+
+            # Integrar anticipos si se provee
+            if anticipos_path:
+                self.utilidades.validar_archivo(anticipos_path)
+                anticipos = self.utilidades.leer_archivo(anticipos_path)
+                anticipos.columns = anticipos.columns.str.strip().str.upper()
+                # Ajustar anticipos a estructura de provisión
+                anticipos["SALDO"] = anticipos["VALOR ANTICIPO"] * -1
+                anticipos["SALDO POR VENCER"] = anticipos["SALDO"]
+                anticipos["SALDO NO VENCIDO"] = anticipos["SALDO"]
+                anticipos = anticipos.reindex(columns=df_pesos.columns, fill_value=None)
+                df_pesos = pd.concat([df_pesos, anticipos], ignore_index=True)
+
+            # Calcular vencimientos por rangos
+            def calcular_vencimientos(row, fecha_cierre):
+                dias_vencido = (fecha_cierre - pd.to_datetime(row["FECHA VTO"]).normalize()).days if pd.notna(row["FECHA VTO"]) else 0
+                buckets = {
+                    "NO_VENCIDO": 0, "VENCIDO_30": 0, "VENCIDO_60": 0, "VENCIDO_90": 0,
+                    "VENCIDO_180": 0, "VENCIDO_360": 0, "VENCIDO_MAS_360": 0
+                }
+                saldo = row.get("SALDO", 0)
+                if dias_vencido < 0:
+                    buckets["NO_VENCIDO"] = saldo
+                elif dias_vencido < 30:
+                    buckets["NO_VENCIDO"] = saldo
+                elif dias_vencido < 60:
+                    buckets["VENCIDO_30"] = saldo
+                elif dias_vencido < 90:
+                    buckets["VENCIDO_60"] = saldo
+                elif dias_vencido < 180:
+                    buckets["VENCIDO_90"] = saldo
+                elif dias_vencido < 360:
+                    buckets["VENCIDO_180"] = saldo
+                elif dias_vencido < 370:
+                    buckets["VENCIDO_360"] = saldo
+                else:
+                    buckets["VENCIDO_MAS_360"] = saldo
+                return pd.Series(buckets)
+
+            fecha_cierre = pd.Timestamp.now().normalize()
+            for df_ in [df_pesos, df_divisas]:
+                vencimientos = df_.apply(lambda row: calcular_vencimientos(row, fecha_cierre), axis=1)
+                for col in vencimientos.columns:
+                    df_[col] = vencimientos[col]
+                # Validar suma de vencimientos = saldo
+                df_["VALIDA_VENCIMIENTOS"] = np.isclose(df_[["NO_VENCIDO","VENCIDO_30","VENCIDO_60","VENCIDO_90","VENCIDO_180","VENCIDO_360","VENCIDO_MAS_360"]].sum(axis=1), df_["SALDO"], atol=1)
+
+            # Totales y TRM para divisas
+            if not df_divisas.empty:
+                df_divisas["SALDO_TRM"] = df_divisas["SALDO"] * trm
+
+            # Crear hoja vencimiento (totales por cliente y bucket)
+            def hoja_vencimiento(df_, moneda):
+                cols = ["CLIENTE","SALDO","NO_VENCIDO","VENCIDO_30","VENCIDO_60","VENCIDO_90","VENCIDO_180","VENCIDO_360","VENCIDO_MAS_360"]
+                if not all(c in df_.columns for c in cols):
+                    return pd.DataFrame()
+                resumen = df_.groupby("CLIENTE")[cols[1:]].sum().reset_index()
+                resumen["MONEDA"] = moneda
+                return resumen
+            hoja_venc_pesos = hoja_vencimiento(df_pesos, "PESOS")
+            hoja_venc_divisas = hoja_vencimiento(df_divisas, "DIVISAS")
+
+            # Guardar en Excel con varias hojas
             nombre_salida = self.utilidades.generar_nombre_archivo_salida("formato_deuda_procesado")
             ruta_salida = self.utilidades.obtener_ruta_resultado(nombre_salida)
-            
-            # Guardar resultado
-            self.utilidades.escribir_resultado(df_procesado, ruta_salida)
-            
-            # Crear resumen
-            resumen = self.utilidades.crear_resumen_procesamiento(df, df_procesado, "Formato Deuda")
-            
+            with pd.ExcelWriter(ruta_salida, engine="xlsxwriter") as writer:
+                df_pesos.to_excel(writer, sheet_name="pesos", index=False)
+                df_divisas.to_excel(writer, sheet_name="divisas", index=False)
+                hoja_venc_pesos.to_excel(writer, sheet_name="vencimiento_pesos", index=False)
+                hoja_venc_divisas.to_excel(writer, sheet_name="vencimiento_divisas", index=False)
+
+            resumen = {
+                "registros_pesos": len(df_pesos),
+                "registros_divisas": len(df_divisas),
+                "archivo": ruta_salida
+            }
             self.logger.info("Procesamiento de formato deuda completado exitosamente")
             return ruta_salida, resumen
-            
         except Exception as e:
             self.logger.error(f"Error en procesamiento de formato deuda: {e}")
             raise

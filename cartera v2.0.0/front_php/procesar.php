@@ -55,40 +55,18 @@ if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK)
     responder_json(false, $error_msg);
 }
 
-
-// Obtener tipo de procesamiento y campos extra
-$tipo = isset($_POST['tipo_procesamiento']) ? limpiar_entrada($_POST['tipo_procesamiento']) : '';
-$tipos_validos = [
-    'cartera', 'acumulado', 'formato_deuda', 'anticipos',
-    'balance_completo', 'balance_especifico', 'focus_especifico'
-];
-if (!in_array($tipo, $tipos_validos)) {
+// Obtener tipo de procesamiento
+$tipo = isset($_POST['tipo']) ? limpiar_entrada($_POST['tipo']) : '';
+if (!in_array($tipo, ['cartera', 'anticipo'])) {
     responder_json(false, 'Tipo de procesamiento no válido');
 }
 
-// Recoger campos adicionales según el tipo
-$args = [];
-if ($tipo === 'formato_deuda') {
-    $args['trm_dolar'] = isset($_POST['trm_dolar']) ? limpiar_entrada($_POST['trm_dolar']) : '';
-    $args['trm_euro'] = isset($_POST['trm_euro']) ? limpiar_entrada($_POST['trm_euro']) : '';
-    if (!is_numeric($args['trm_dolar']) || !is_numeric($args['trm_euro'])) {
-        responder_json(false, 'Debe ingresar TRM Dólar y Euro válidos');
-    }
-} elseif ($tipo === 'balance_especifico' || $tipo === 'focus_especifico') {
-    $args['mes'] = isset($_POST['mes']) ? limpiar_entrada($_POST['mes']) : '';
-    $args['division'] = isset($_POST['division']) ? limpiar_entrada($_POST['division']) : '';
-    if (!$args['mes'] || !$args['division']) {
-        responder_json(false, 'Debe ingresar mes y división');
-    }
-} elseif ($tipo === 'anticipos') {
-    $args['fecha_corte'] = isset($_POST['fecha_corte']) ? limpiar_entrada($_POST['fecha_corte']) : '';
-    if (!$args['fecha_corte']) {
-        responder_json(false, 'Debe ingresar la fecha de corte');
-    }
-} elseif ($tipo === 'balance_completo') {
-    $args['mes'] = isset($_POST['mes']) ? limpiar_entrada($_POST['mes']) : '';
-    if (!$args['mes']) {
-        responder_json(false, 'Debe ingresar el mes');
+// Obtener fecha de cierre si es cartera
+$fecha_cierre = null;
+if ($tipo === 'cartera' && isset($_POST['fecha_cierre'])) {
+    $fecha_cierre = limpiar_entrada($_POST['fecha_cierre']);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_cierre)) {
+        responder_json(false, 'Formato de fecha de cierre no válido. Use YYYY-MM-DD');
     }
 }
 
@@ -111,11 +89,13 @@ $tipo_archivo = $archivo['type'];
 $tamanio = $archivo['size'];
 $tmp_name = $archivo['tmp_name'];
 
-
+// Validar extensión según tipo
 $extension = strtolower(pathinfo($nombre_original, PATHINFO_EXTENSION));
-// Puedes personalizar las extensiones permitidas por tipo si lo deseas
-if (!in_array($extension, ['csv', 'xlsx', 'xls'])) {
-    responder_json(false, 'Solo se permiten archivos CSV, XLSX o XLS');
+if ($tipo === 'cartera' && $extension !== 'csv') {
+    responder_json(false, 'Para cartera solo se permiten archivos CSV');
+}
+if ($tipo === 'anticipo' && !in_array($extension, ['xlsx', 'xls', 'csv'])) {
+    responder_json(false, 'Para anticipos se permiten archivos XLSX, XLS o CSV');
 }
 
 // Validar tamaño (máximo 10MB)
@@ -142,23 +122,19 @@ if (!file_exists($python_path)) {
     responder_json(false, "No se encontró Python en la ruta: $python_path");
 }
 
+// Ejecutar script de Python correspondiente
+$python_script = '';
+$comando = '';
 
-// Seleccionar script Python según tipo
-$scripts = [
-    'cartera' => 'PROVCA/procesador_cartera.py',
-    'acumulado' => 'PROVCA/procesador_acumulado.py',
-    'formato_deuda' => 'PROVCA/procesador_formato_deuda.py',
-    'anticipos' => 'PROVCA/procesador_anticipos.py',
-    'balance_completo' => 'PROVCA/procesador_balance_completo.py',
-    'balance_especifico' => 'PROVCA/procesador_balance_especifico.py',
-    'focus_especifico' => 'PROVCA/procesador_focus_especifico.py',
-];
-$python_script = $scripts[$tipo];
-
-// Construir comando con argumentos
-$comando = "\"$python_path\" \"$python_script\" \"$ruta_archivo\"";
-foreach ($args as $arg) {
-    $comando .= " \"$arg\"";
+if ($tipo === 'cartera') {
+    $python_script = 'PROVCA/procesador_cartera.py';
+    $comando = "\"$python_path\" \"$python_script\" \"$ruta_archivo\"";
+    if ($fecha_cierre) {
+        $comando .= " \"$fecha_cierre\"";
+    }
+} else { // anticipo
+    $python_script = 'PROVCA/procesador_anticipos.py';
+    $comando = "\"$python_path\" \"$python_script\" \"$ruta_archivo\"";
 }
 
 // Verificar que existe el script de Python
@@ -190,16 +166,17 @@ if ($return_var !== 0) {
     responder_json(false, "Error durante el procesamiento. Código: $return_var. Salida: $error_output");
 }
 
-
 // Buscar archivo de salida generado
 $archivos_salida = glob($output_dir . $tipo . '*_PROCESAD*' . $timestamp . '*.xlsx');
 if (empty($archivos_salida)) {
     // Buscar archivos más recientes si no encuentra por timestamp exacto
     $archivos_salida = glob($output_dir . $tipo . '*_PROCESAD*.xlsx');
+    // Ordenar por fecha de modificación (más reciente primero)
     usort($archivos_salida, function($a, $b) {
         return filemtime($b) - filemtime($a);
     });
 }
+
 if (empty($archivos_salida)) {
     unlink($ruta_archivo); // Eliminar archivo subido
     responder_json(false, 'No se pudo encontrar el archivo de salida generado');
@@ -207,15 +184,43 @@ if (empty($archivos_salida)) {
 
 $archivo_salida = $archivos_salida[0];
 $nombre_archivo_salida = basename($archivo_salida);
+
+// Verificar que el archivo de salida existe y no está vacío
 if (!file_exists($archivo_salida) || filesize($archivo_salida) === 0) {
     unlink($ruta_archivo); // Eliminar archivo subido
     responder_json(false, 'El archivo de salida está vacío o no se pudo crear');
 }
+
+// Limpiar archivo de entrada
 unlink($ruta_archivo);
 
-$mensaje_exito = "El archivo de $tipo se ha procesado correctamente.";
-$url_descarga = "descargar_resultado.php?file=" . urlencode($archivo_salida);
-responder_json(true, $mensaje_exito, [
-    'archivo_generado' => $nombre_archivo_salida,
-    'url_descarga' => $url_descarga
-]);
+// Preparar respuesta exitosa
+$tipo_titulo = $tipo === 'cartera' ? 'Cartera' : 'Anticipos';
+$mensaje_exito = "El archivo de $tipo_titulo se ha procesado correctamente.";
+
+// Crear enlace de descarga
+$url_descarga = "descargar.php?file=" . urlencode($archivo_salida);
+
+// Respuesta HTML para el frontend
+$html_response = "
+<div class='resultado-procesamiento'>
+    <div class='resultado-header'>
+        <i class='fas fa-check-circle'></i>
+        <h3>Procesamiento Completado</h3>
+    </div>
+    <div class='resultado-body'>
+        <p>$mensaje_exito</p>
+        <div class='archivo-info'>
+            <strong>Archivo generado:</strong> $nombre_archivo_salida
+        </div>
+    </div>
+    <div class='resultado-actions'>
+        <a href='$url_descarga' class='btn-descarga' target='_blank'>
+            <i class='fas fa-download'></i>
+            Descargar Archivo
+        </a>
+    </div>
+</div>";
+
+echo $html_response;
+?> 

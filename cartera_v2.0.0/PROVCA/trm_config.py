@@ -7,6 +7,7 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'trm_config.json')
 
 
 def _ensure_dir_exists(path):
+    """Asegura que el directorio para el archivo de configuración exista."""
     directory = os.path.dirname(path)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
@@ -14,7 +15,7 @@ def _ensure_dir_exists(path):
 
 def load_trm():
     """Devuelve un dict {'usd': float|None, 'eur': float|None, 'updated_at': str|None}.
-    Si no existe, retorna valores en None.
+    Si el archivo no existe o hay un error, retorna un diccionario con valores nulos.
     """
     try:
         if not os.path.exists(CONFIG_PATH):
@@ -33,7 +34,7 @@ def load_trm():
 
 
 def save_trm(usd, eur):
-    """Guarda TRM en archivo JSON y devuelve la ruta."""
+    """Guarda los valores de TRM en un archivo JSON."""
     _ensure_dir_exists(CONFIG_PATH)
     payload = {
         'usd': float(usd) if usd is not None else None,
@@ -46,13 +47,8 @@ def save_trm(usd, eur):
 
 
 def parse_trm_value(text, fallback=None):
-    """Parsea valores de TRM ingresados por el usuario con formato LATAM.
-    Reglas:
-    - Si tiene '.' y ',' → quitar puntos (miles) y usar coma como decimal
-    - Si solo tiene ',' → usar como decimal
-    - Si solo tiene '.' → si los grupos después de los puntos son de 3 en 3, tratar como miles
-      (ej: "4.780" -> 4780), de lo contrario tratar como decimal
-    - Si no tiene separadores → convertir directo
+    """Parsea valores de TRM ingresados por el usuario con formato LATAM,
+    convirtiéndolos a float.
     """
     try:
         if text is None:
@@ -60,28 +56,36 @@ def parse_trm_value(text, fallback=None):
         s = str(text).strip().replace('\u200b', '').replace(' ', '')
         if s == '':
             return fallback
+
+        # Si tiene punto y coma, trata la coma como decimal y el punto como miles.
         if '.' in s and ',' in s:
             s = s.replace('.', '').replace(',', '.')
-            return float(s)
-        if ',' in s:
-            return float(s.replace(',', '.'))
-        if '.' in s:
+        # Si solo tiene coma, trata la coma como decimal.
+        elif ',' in s:
+            s = s.replace(',', '.')
+        # Si solo tiene punto, se evalúa si es un separador de miles o un decimal.
+        elif '.' in s:
             parts = s.split('.')
             if len(parts) > 1 and all(p.isdigit() and len(p) == 3 for p in parts[1:]) and parts[0].isdigit():
-                # puntos como miles
-                return float(''.join(parts))
-            return float(s)
+                # Puntos como miles (ej. "4.780" -> 4780)
+                s = ''.join(parts)
+            # Si no, se asume que el punto es un decimal (ej. "4.5" -> 4.5)
+
         return float(s)
     except Exception:
         return fallback
 
 
 def format_trm_display(value):
-    """Formatea TRM para mostrar con separador de miles y sin decimales: 4780 -> '4.780'."""
+    """Formatea la TRM para mostrarla con separador de miles.
+    Ejemplo: 4780 -> '4.780'
+    """
     try:
         if value is None:
             return '-'
-        return f"{float(value):,.0f}".replace(',', '.')
+        # Convertir a float y luego a string con formato de miles
+        formatted_value = f"{float(value):,.0f}"
+        # Reemplazar la coma por punto para el formato LATAM
+        return formatted_value.replace(',', '.')
     except Exception:
         return str(value)
-

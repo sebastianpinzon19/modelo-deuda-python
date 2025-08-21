@@ -5,7 +5,6 @@ Procesador de Cartera PROVCA
 - Corrige generación de meses históricos desde fecha de cierre exacta
 - Llena DENOMINACION COMERCIAL con NOMBRE si está vacío
 - Mantiene columnas de día, mes y año de fechas
-- Quita validaciones de OK/ERROR
 """
 
 import pandas as pd

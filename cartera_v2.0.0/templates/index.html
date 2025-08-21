@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Archivos - Grupo Planeta</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #1e3a8a;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header h1 i {
+            color: #3b82f6;
+            font-size: 2.5rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .main-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .panel-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .panel-header .icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: white;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-header h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .panel-header p {
+            color: #6b7280;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 500;
+            background: #fff;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .trm-container {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+
+        .trm-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .trm-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .trm-subtitle {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+
+        .trm-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .trm-field label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .trm-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #fff;
+            transition: all 0.3s ease;
+        }
+
+        .trm-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .trm-save-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .trm-save-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.3);
+        }
+
+        .trm-status {
+            margin-top: 15px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .trm-status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .trm-status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .trm-status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .result-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .result-success {
+            background: #d1fae5;
+            border-color: #6ee7b7;
+        }
+
+        .result-error {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .download-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .download-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #1f2937;
+            font-weight: 600;
+        }
+
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .header h1 i {
+                font-size: 2rem;
+            }
+
+            .main-panel {
+                padding: 30px 20px;
+            }
+
+            .trm-fields {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .form-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        /* Animaciones */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .main-panel {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-chart-line"></i>
+                <span>Procesador de Archivos</span>
+            </h1>
+            <p>Sistema de procesamiento de cartera y anticipos - Grupo Planeta</p>
+        </div>
+
+        <!-- Panel principal -->
+        <div class="main-panel">
+            <div class="panel-header">
+                <div class="icon">
+                    <i class="fas fa-sliders-h"></i>
+                </div>
+                <h3>Selecciona el proceso</h3>
+                <p>Según la opción, aparecen las acciones disponibles</p>
+            </div>
+
+            <!-- Selector de proceso -->
+            <div class="form-group">
+                <label for="procesoSelect">Proceso:</label>
+                <select id="procesoSelect" class="form-control">
+                    <option value="cartera">Cartera (Provisión)</option>
+                    <option value="anticipos">Anticipos</option>
+                    <option value="modelo">Modelo Deuda</option>
+                    <option value="balance">Balance</option>
+                </select>
+            </div>
+
+            <!-- Acciones dinámicas -->
+            <div id="acciones"></div>
+
+            <!-- TRM Configuration -->
+            <div id="trmBox" class="trm-container">
+                <div class="trm-header">
+                    <h4 class="trm-title">
+                        <i class="fas fa-exchange-alt"></i> Tasas de Cambio (TRM)
+                    </h4>
+                    <div class="trm-subtitle">Ingresa las tasas de cambio para las conversiones de moneda</div>
+                </div>
+                <div class="trm-fields">
+                    <div class="trm-field">
+                        <label class="trm-label">
+                            <i class="fas fa-dollar-sign"></i> Dólar (USD/COP)
+                        </label>
+                        <input id="trmUsd" type="number" step="0.01" min="0" placeholder="Ej: 4000" class="trm-input">
+                    </div>
+                    <div class="trm-field">
+                        <label class="trm-label">
+                            <i class="fas fa-euro-sign"></i> Euro (EUR/COP)
+                        </label>
+                        <input id="trmEur" type="number" step="0.01" min="0" placeholder="Ej: 4700" class="trm-input">
+                    </div>
+                    <div class="trm-field">
+                        <button id="btnGuardarTRM" type="button" class="trm-save-btn">
+                            <i class="fas fa-save"></i> Guardar TRM
+                        </button>
+                    </div>
+                </div>
+                <div id="trmStatus" class="trm-status info"></div>
+            </div>
+
+            <!-- Resultado -->
+            <div id="resultado"></div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        const acciones = document.getElementById('acciones');
+        const select = document.getElementById('procesoSelect');
+        const trmBox = document.getElementById('trmBox');
+        const trmUsd = document.getElementById('trmUsd');
+        const trmEur = document.getElementById('trmEur');
+        const resultado = document.getElementById('resultado');
+
+        // Templates para cada proceso
+        const templates = {
+            cartera: `
+                <form id="formCartera" class="form-group">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="archivoCartera">Archivo CSV:</label>
+                            <input type="file" id="archivoCartera" name="archivo" accept=".csv" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="monedaCartera">Moneda:</label>
+                            <select id="monedaCartera" name="moneda" class="form-control">
+                                <option value="">Por defecto</option>
+                                <option value="PESOS COL">PESOS COL</option>
+                                <option value="USD">USD</option>
+                                <option value="EURO">EURO</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="fechaCierre">Fecha de Cierre:</label>
+                            <input type="date" id="fechaCierre" name="fecha_cierre" class="form-control" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-file-invoice-dollar"></i> Generar Cartera
+                    </button>
+                </form>
+            `,
+            anticipos: `
+                <form id="formAnticipos" class="form-group">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="archivoAnticipos">Archivo Excel:</label>
+                            <input type="file" id="archivoAnticipos" name="archivo" accept=".xlsx,.xls" required class="form-control">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-hand-holding-usd"></i> Generar Anticipos
+                    </button>
+                </form>
+            `,
+            modelo: `
+                <form id="formModelo" class="form-group">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="archivoCarteraModelo">Archivo Cartera:</label>
+                            <input type="file" id="archivoCarteraModelo" name="cartera" accept=".xlsx,.xls" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="archivoAnticiposModelo">Archivo Anticipos:</label>
+                            <input type="file" id="archivoAnticiposModelo" name="anticipos" accept=".xlsx,.xls" required class="form-control">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-calculator"></i> Generar Modelo Deuda
+                    </button>
+                </form>
+            `,
+            balance: `
+                <form id="formBalance" class="form-group">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="archivoBalance">Archivo Excel:</label>
+                            <input type="file" id="archivoBalance" name="archivo" accept=".xlsx,.xls" required class="form-control">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-balance-scale"></i> Procesar Balance
+                    </button>
+                </form>
+            `
+        };
+
+        // Funciones de utilidad
+        function showLoading(message = 'Procesando...') {
+            resultado.innerHTML = `
+                <div class="result-container">
+                    <div class="loading">${message}</div>
+                </div>
+            `;
+        }
+
+        function showResult(success, message, downloadUrl = null, fileName = null, trmInfo = null) {
+            const containerClass = success ? 'result-success' : 'result-error';
+            let content = `<div class="result-container ${containerClass}">`;
+            
+            if (success && downloadUrl) {
+                content += `
+                    <a href="${downloadUrl}" class="download-link" target="_blank">
+                        <i class="fas fa-download"></i> Descargar ${fileName}
+                    </a>
+                `;
+            }
+            
+            content += `<p style="margin-top: 10px; font-weight: 600;">${message}</p>`;
+            
+            if (trmInfo) {
+                content += `<p style="margin-top: 5px; font-size: 0.9rem; color: #6b7280;">
+                    TRM USD=${trmInfo.usd || '-'} | EUR=${trmInfo.eur || '-'}
+                </p>`;
+            }
+            
+            content += '</div>';
+            resultado.innerHTML = content;
+        }
+
+        function showTRMStatus(message, type = 'info') {
+            const status = document.getElementById('trmStatus');
+            status.className = `trm-status ${type}`;
+            status.textContent = message;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.textContent = '';
+                    status.className = 'trm-status info';
+                }, 3000);
+            }
+        }
+
+        // API Functions
+        async function fetchTRM() {
+            try {
+                const response = await fetch('/api/trm');
+                const data = await response.json();
+                if (data.ok) {
+                    trmUsd.value = data.trm_usd || '';
+                    trmEur.value = data.trm_eur || '';
+                    updateTRMStatus();
+                }
+            } catch (error) {
+                console.error('Error cargando TRM:', error);
+            }
+        }
+
+        async function saveTRM() {
+            const usd = trmUsd.value.trim();
+            const eur = trmEur.value.trim();
+            
+            if (!usd && !eur) {
+                showTRMStatus('Por favor ingresa al menos una tasa de cambio', 'error');
+                return;
+            }
+            
+            if (usd && (isNaN(parseFloat(usd)) || parseFloat(usd) <= 0)) {
+                showTRMStatus('El TRM del Dólar debe ser un número válido mayor a 0', 'error');
+                trmUsd.focus();
+                return;
+            }
+            
+            if (eur && (isNaN(parseFloat(eur)) || parseFloat(eur) <= 0)) {
+                showTRMStatus('El TRM del Euro debe ser un número válido mayor a 0', 'error');
+                trmEur.focus();
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/trm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        trm_usd: usd || null,
+                        trm_eur: eur || null
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.ok) {
+                    showTRMStatus('Tasas de cambio guardadas correctamente', 'success');
+                    trmUsd.value = data.trm_usd || usd;
+                    trmEur.value = data.trm_eur || eur;
+                } else {
+                    showTRMStatus('Error al guardar: ' + (data.error || 'Error desconocido'), 'error');
+                }
+            } catch (error) {
+                showTRMStatus('Error de conexión al guardar', 'error');
+                console.error('Error guardando TRM:', error);
+            }
+        }
+
+        function updateTRMStatus() {
+            const usd = trmUsd.value.trim();
+            const eur = trmEur.value.trim();
+            
+            if (usd && eur) {
+                showTRMStatus(`TRM configurada: USD=${usd} | EUR=${eur}`, 'info');
+            } else if (usd) {
+                showTRMStatus(`TRM configurada: USD=${usd}`, 'info');
+            } else if (eur) {
+                showTRMStatus(`TRM configurada: EUR=${eur}`, 'info');
+            } else {
+                showTRMStatus('Ingresa las tasas de cambio para continuar', 'info');
+            }
+        }
+
+        // Renderizar acciones según el proceso seleccionado
+        function renderAcciones() {
+            const proceso = select.value;
+            acciones.innerHTML = templates[proceso] || '';
+            
+            // Configurar event listeners para los formularios
+            setTimeout(() => {
+                const formCartera = document.getElementById('formCartera');
+                const formAnticipos = document.getElementById('formAnticipos');
+                const formModelo = document.getElementById('formModelo');
+                const formBalance = document.getElementById('formBalance');
+                
+                if (formCartera) {
+                    formCartera.addEventListener('submit', handleCarteraSubmit);
+                }
+                if (formAnticipos) {
+                    formAnticipos.addEventListener('submit', handleAnticiposSubmit);
+                }
+                if (formModelo) {
+                    formModelo.addEventListener('submit', handleModeloSubmit);
+                }
+                if (formBalance) {
+                    formBalance.addEventListener('submit', handleBalanceSubmit);
+                }
+            }, 100);
+        }
+
+        // Handlers para formularios
+        async function handleCarteraSubmit(e) {
+            e.preventDefault();
+            showLoading('Procesando cartera...');
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/procesar/cartera', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.ok) {
+                    showResult(true, 'Cartera procesada exitosamente', data.url, data.file, {
+                        usd: data.trm_usd,
+                        eur: data.trm_eur
+                    });
+                } else {
+                    showResult(false, data.error);
+                }
+            } catch (error) {
+                showResult(false, 'Error de conexión');
+                console.error('Error procesando cartera:', error);
+            }
+        }
+
+        async function handleAnticiposSubmit(e) {
+            e.preventDefault();
+            showLoading('Procesando anticipos...');
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/procesar/anticipos', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.ok) {
+                    showResult(true, 'Anticipos procesados exitosamente', data.url, data.file, {
+                        usd: data.trm_usd,
+                        eur: data.trm_eur
+                    });
+                } else {
+                    showResult(false, data.error);
+                }
+            } catch (error) {
+                showResult(false, 'Error de conexión');
+                console.error('Error procesando anticipos:', error);
+            }
+        }
+
+        async function handleModeloSubmit(e) {
+            e.preventDefault();
+            showLoading('Generando modelo de deuda...');
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/procesar/modelo', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.ok) {
+                    showResult(true, 'Modelo de deuda generado exitosamente', data.url, data.file, {
+                        usd: data.trm_usd,
+                        eur: data.trm_eur
+                    });
+                } else {
+                    showResult(false, data.error);
+                }
+            } catch (error) {
+                showResult(false, 'Error de conexión');
+                console.error('Error procesando modelo:', error);
+            }
+        }
+
+        async function handleBalanceSubmit(e) {
+            e.preventDefault();
+            showLoading('Procesando balance...');
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/procesar/balance', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.ok) {
+                    showResult(true, 'Balance procesado exitosamente', data.url, data.file, {
+                        usd: data.trm_usd,
+                        eur: data.trm_eur
+                    });
+                } else {
+                    showResult(false, data.error);
+                }
+            } catch (error) {
+                showResult(false, 'Error de conexión');
+                console.error('Error procesando balance:', error);
+            }
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cargar TRM al inicio
+            fetchTRM();
+            
+            // Renderizar acciones iniciales
+            renderAcciones();
+            
+            // Event listeners
+            select.addEventListener('change', renderAcciones);
+            
+            document.getElementById('btnGuardarTRM').addEventListener('click', saveTRM);
+            
+            trmUsd.addEventListener('input', updateTRMStatus);
+            trmEur.addEventListener('input', updateTRMStatus);
+            
+            // Efectos visuales en campos TRM
+            [trmUsd, trmEur].forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.style.borderColor = '#3b82f6';
+                });
+                input.addEventListener('blur', function() {
+                    this.style.borderColor = '#d1d5db';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

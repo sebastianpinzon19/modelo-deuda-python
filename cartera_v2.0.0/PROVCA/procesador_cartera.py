@@ -1,651 +1,330 @@
+# -*- coding: utf-8 -*-
 """
-AREA DE CARTERA - PROCESO FORMATO DEUDA
-
-Este script procesa el archivo de provisión (provision.csv) generado por el sistema Pisa, siguiendo las reglas y transformaciones requeridas por el área de cartera:
-
-OBJETIVO:
-El objetivo de implementar el formato de deuda es contar con la información necesaria de manera óptima, veraz y oportuna, lo que permitirá elaborar de forma eficiente el reporte requerido por la casa matriz.
-
-PROCESO:
-1. Renombra los campos según el mapeo oficial
-2. Elimina la columna PCIMCO
-3. Elimina la fila de empresa PL30 con valor -614.000
-4. Unifica nombres de clientes en una sola columna
-5. Convierte fechas y crea columnas de día, mes, año
-6. Calcula días vencidos, días por vencer, saldo vencido
-7. Calcula % dotación, valor dotación, mora total
-8. Crea vencimientos históricos de los últimos 6 meses
-9. Calcula vencimiento 180 días
-10. Calcula valores por vencer de los próximos 3 meses
-11. Calcula mayor a 90 días y valor total por vencer
-12. Valida que la suma de mora total + valor por vencer sea igual al saldo
-13. Crea columnas de vencimientos por rango de días y valida su suma
-14. Crea columna de deuda incobrable
-15. Aplica formato colombiano a los números
-
-Este script procesa únicamente el archivo de provisión de forma independiente.
+Procesador de Cartera PROVCA
+- Conserva funciones originales
+- Corrige generación de meses históricos desde fecha de cierre exacta
+- Llena DENOMINACION COMERCIAL con NOMBRE si está vacío
+- Mantiene columnas de día, mes y año de fechas
+- Quita validaciones de OK/ERROR
 """
+
 import pandas as pd
-import numpy as np
-from datetime import datetime, date
+from datetime import datetime
 import os
 import sys
-import locale
-import warnings
-import re
+from trm_config import load_trm, save_trm, parse_trm_value, format_trm_display
 
-def convertir_valor(valor_str):
-    try:
-        if valor_str is None:
-            return 0.0
-        if isinstance(valor_str, (int, float)):
-            return float(valor_str)
-
-        s = str(valor_str).strip().replace('\u200b', '').replace(' ', '')
-        if s == '' or s.lower() == 'nan':
-            return 0.0
-
-        if s.count('.') > 1 and s.count(',') > 1:
-            numeros = re.findall(r'\d+', s)
-            if numeros:
-                if len(numeros) >= 2:
-                    parte_entera = numeros[0]
-                    parte_decimal = numeros[1][:2] if len(numeros[1]) >= 2 else numeros[1]
-                    s = f"{parte_entera}.{parte_decimal}"
-                else:
-                    s = numeros[0]
-        elif s.count('.') > 1:
-            partes = s.split('.')
-            if len(partes) > 2:
-                s = ''.join(partes[:-1]) + '.' + partes[-1]
-        elif s.count(',') > 1:
-            partes = s.split(',')
-            if len(partes) > 2:
-                s = ''.join(partes[:-1]) + '.' + partes[-1]
-
-        if '.' in s and ',' in s:
-            s = s.replace('.', '').replace(',', '.')
-        elif ',' in s and '.' not in s:
-            partes = s.split(',')
-            if len(partes) == 2 and len(partes[1]) == 3:
-                s = s.replace(',', '.')
-            else:
-                s = s.replace(',', '.')
-
-        resultado = float(s)
-        if pd.isna(resultado) or resultado in (float('inf'), float('-inf')):
-            return 0.0
-
-        return resultado
-    except Exception as e:
-        print(f"Error convirtiendo valor: {valor_str}, Error: {e}")
-        return 0.0
-
-
-warnings.filterwarnings('ignore')
-
-# Mapeo oficial de columnas según especificaciones
-MAPEO_PROVISION = {
-    'PCCDEM': 'EMPRESA',
-    'PCCDAC': 'ACTIVIDAD', 
-    'PCDEAC': 'EMPRESA',
-    'PCCDAG': 'CODIGO AGENTE',
-    'PCNMAG': 'AGENTE',
-    'PCCDCO': 'CODIGO COBRADOR',
-    'PCNMCO': 'COBRADOR',
-    'PCCDCL': 'CODIGO CLIENTE',
-    'PCCDDN': 'IDENTIFICACION',
-    'PCNMCL': 'NOMBRE',
-    'PCNMCM': 'DENOMINACION COMERCIAL',
-    'PCNMDO': 'DIRECCION',
-    'PCTLF1': 'TELEFONO',
-    'PCNMPO': 'CIUDAD',
-    'PCNUFC': 'NUMERO FACTURA',
-    'PCORPD': 'TIPO',
-    'PCFEFA': 'FECHA',
-    'PCFEVE': 'FECHA VTO',
-    'PCVAFA': 'VALOR',
-    'PCSALD': 'SALDO'
+# -------------------
+# Configuración
+# -------------------
+RENOMBRES = {
+    "PCCDEM": "EMPRESA",
+    "PCCDAC": "ACTIVIDAD",
+    "PCDEAC": "EMPRESA_2",
+    "PCCDAG": "CODIGO AGENTE",
+    "PCNMAG": "AGENTE",
+    "PCCDCO": "CODIGO COBRADOR",
+    "PCNMCO": "COBRADOR",
+    "PCCDCL": "CODIGO CLIENTE",
+    "PCCDDN": "IDENTIFICACION",
+    "PCNMCL": "NOMBRE",
+    "PCNMCM": "DENOMINACION COMERCIAL",
+    "PCNMDO": "DIRECCION",
+    "PCTLF1": "TELEFONO",
+    "PCNMPO": "CIUDAD",
+    "PCNUFC": "NUMERO FACTURA",
+    "PCORPD": "TIPO",
+    "PCFEFA": "FECHA",
+    "PCFEVE": "FECHA VTO",
+    "PCVAFA": "VALOR",
+    "PCSALD": "SALDO"
 }
 
-# Configuración de rangos de vencimiento según especificaciones
 VENCIMIENTOS_RANGOS = [
-    ('SALDO NO VENCIDO', 0, 29),
-    ('VENCIDO 30', 30, 59),
-    ('VENCIDO 60', 60, 89),
-    ('VENCIDO 90', 90, 179),
-    ('VENCIDO 180', 180, 359),
-    ('VENCIDO 360', 360, 369),
-    ('VENCIDO + 360', 370, 99999)
+    ("SALDO NO VENCIDO", 0, 29),
+    ("VENCIDO 30", 30, 59),
+    ("VENCIDO 60", 60, 89),
+    ("VENCIDO 90", 90, 179),
+    ("VENCIDO 180", 180, 359),
+    ("VENCIDO 360", 360, 369),
+    ("VENCIDO + 360", 370, 999999),
 ]
 
+OUT_DIR = r"C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\PROVCA_PROCESADOS"
+os.makedirs(OUT_DIR, exist_ok=True)
+
+# -------------------
+# Helpers
+# -------------------
 def obtener_fecha_cierre(fecha_cierre_str=None):
-    """Obtiene la fecha de cierre. Si se proporciona fecha_cierre_str, la usa; si no, usa el último día del mes actual"""
     if fecha_cierre_str:
-        try:
-            return datetime.strptime(fecha_cierre_str, '%Y-%m-%d')
-        except ValueError:
-            print(f"ADVERTENCIA: Formato de fecha incorrecto '{fecha_cierre_str}'. Usando fecha por defecto.")
-    
-    # Fecha por defecto: último día del mes actual
-    hoy = datetime.now()
-    if hoy.month == 12:
-        cierre = datetime(hoy.year + 1, 1, 1) - pd.Timedelta(days=1)
-    else:
-        cierre = datetime(hoy.year, hoy.month + 1, 1) - pd.Timedelta(days=1)
-    return cierre
+        dt = pd.to_datetime(fecha_cierre_str, errors="coerce")
+        if pd.isna(dt):
+            raise ValueError("Fecha de cierre inválida. Use YYYY-MM-DD")
+        return pd.to_datetime(dt).normalize()
+    return pd.to_datetime(datetime.today()).normalize()
 
-def limpiar_y_validar_datos(df):
-    """Limpia y valida los datos del DataFrame"""
-    print("Iniciando limpieza y validación de datos...")
-    
-    # Limpiar nombres de columnas
-    df.columns = df.columns.str.strip()
-    
-    # Corregir nombres de columnas con caracteres especiales
-    if 'DENOMINACIÓN COMERCIAL' in df.columns:
-        df.rename(columns={'DENOMINACIÓN COMERCIAL': 'DENOMINACION COMERCIAL'}, inplace=True)
-    
-    # Renombrar columnas según mapeo oficial
-    columnas_renombradas = {}
-    for col_original, col_nueva in MAPEO_PROVISION.items():
-        if col_original in df.columns:
-            columnas_renombradas[col_original] = col_nueva
-    
-    df = df.rename(columns=columnas_renombradas)
-    print(f"Columnas renombradas: {len(columnas_renombradas)}")
-    
-    # Eliminar columna PCIMCO si existe
-    if 'PCIMCO' in df.columns:
-        df = df.drop(columns=['PCIMCO'])
-        print("Columna PCIMCO eliminada")
-    
-    # Eliminar fila de empresa PL30 (PCCDAC = 30 y valor -614.000)
-    if 'ACTIVIDAD' in df.columns and 'SALDO' in df.columns:
-        registros_antes = len(df)
-        # Convertir valores de saldo para comparación
-        saldos_convertidos = df['SALDO'].apply(lambda x: float(str(x).replace(',','').replace('$','')) if pd.notna(x) and str(x).replace(',','').replace('$','').replace('.','',1).replace('-','',1).isdigit() else 0)
-        df = df[~((df['ACTIVIDAD'].astype(str).str.strip() == '30') & (saldos_convertidos == -614000))]
-        registros_eliminados = registros_antes - len(df)
-        if registros_eliminados > 0:
-            print(f"Eliminados {registros_eliminados} registros de empresa PL30")
-    
-    # Validar y corregir valores negativos en saldos
-    if 'SALDO' in df.columns:
-        saldos_convertidos = df['SALDO'].apply(lambda x: float(str(x).replace(',','').replace('$','')) if pd.notna(x) and str(x).replace(',','').replace('$','').replace('.','',1).replace('-','',1).isdigit() else 0)
-        valores_negativos = saldos_convertidos < 0
-        if valores_negativos.any():
-            print(f"ADVERTENCIA: Se encontraron {valores_negativos.sum()} registros con valores negativos en SALDO")
-            print("Los valores negativos se convertirán a positivos para el procesamiento")
-            df['SALDO'] = df['SALDO'].apply(lambda x: str(abs(float(str(x).replace(',','').replace('$','')))) if pd.notna(x) and float(str(x).replace(',','').replace('$','')) < 0 else str(x))
-    
-    return df
+def convertir_valor_to_float(x):
+    if pd.isna(x):
+        return 0.0
+    s = str(x).strip()
+    if s == "" or s in ["-", "0"]:
+        return 0.0
+    s = s.replace("$", "").replace(" ", "").replace("\u200b", "")
+    s = s.replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except Exception:
+        digits = "".join(ch for ch in s if ch.isdigit() or ch == ".")
+        return float(digits) if digits else 0.0
 
-def unificar_nombres_clientes(df):
-    """Unifica los nombres de clientes en una sola columna"""
-    print("Unificando nombres de clientes...")
-    
-    if 'NOMBRE' in df.columns and 'DENOMINACION COMERCIAL' in df.columns:
-        # Llenar valores vacíos en DENOMINACION COMERCIAL con NOMBRE
-        df['DENOMINACION COMERCIAL'] = df['DENOMINACION COMERCIAL'].fillna('')
-        df['NOMBRE'] = df['NOMBRE'].fillna('')
-        
-        # Unificar: si DENOMINACION COMERCIAL está vacía, usar NOMBRE
-        df['DENOMINACION COMERCIAL'] = df.apply(
-            lambda row: row['NOMBRE'] if pd.isna(row['DENOMINACION COMERCIAL']) or str(row['DENOMINACION COMERCIAL']).strip() == '' 
-            else row['DENOMINACION COMERCIAL'], axis=1
-        )
-        
-        print("Nombres de clientes unificados correctamente")
-    
-    return df
+def formato_fecha_str(dt):
+    if pd.isna(dt):
+        return ""
+    return pd.to_datetime(dt).strftime("%d/%m/%Y")
 
-def procesar_fechas(df, fecha_cierre_str=None):
-    """Procesa las fechas y crea columnas separadas"""
-    print("Procesando fechas...")
-    
-    fecha_cierre = obtener_fecha_cierre(fecha_cierre_str)
-    
-    def convertir_fecha(fecha_str):
-        """
-        Convierte una cadena de fecha a formato (True, dia, mes, año, datetime) o (False, None, None, None, None) si falla.
-        """
-        if pd.isna(fecha_str) or str(fecha_str).strip() == '':
-            return (False, None, None, None, None)
-        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d'):
+def parse_fecha_segura(serie):
+    def try_parse(val):
+        if pd.isna(val) or str(val).strip() == "":
+            return pd.NaT
+        formatos = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%Y%m%d"]
+        for fmt in formatos:
             try:
-                fecha_dt = datetime.strptime(str(fecha_str).strip(), fmt)
-                return (True, fecha_dt.day, fecha_dt.month, fecha_dt.year, fecha_dt)
-            except Exception:
+                return datetime.strptime(str(val).strip(), fmt)
+            except ValueError:
                 continue
-        return (False, None, None, None, None)
+        return pd.to_datetime(val, errors="coerce", dayfirst=True)
+    return serie.apply(try_parse)
 
-    for col_fecha in ['FECHA', 'FECHA VTO']:
-        if col_fecha in df.columns:
-            # Convertir fechas
-            fechas_convertidas = df[col_fecha].apply(convertir_fecha)
-            
-            # Formatear fechas en formato dd/mm/yyyy
-            fechas_formateadas = []
-            dias = []
-            meses = []
-            años = []
-            fechas_datetime = []
-            
-            for fecha_conv in fechas_convertidas:
-                if fecha_conv[0]:  # Si la conversión fue exitosa
-                    _, dia, mes, anio, fecha_dt = fecha_conv
-                    fechas_formateadas.append(f"{dia:02d}/{mes:02d}/{anio}")
-                    dias.append(dia)
-                    meses.append(mes)
-                    años.append(anio)
-                    fechas_datetime.append(fecha_dt)
-                else:
-                    fechas_formateadas.append("")
-                    dias.append("")
-                    meses.append("")
-                    años.append("")
-                    fechas_datetime.append(None)
-            
-            # Actualizar columna original
-            df[col_fecha] = fechas_formateadas
-            
-            # Crear columnas separadas
-            df[f'DIA {col_fecha}'] = dias
-            df[f'MES {col_fecha}'] = meses
-            df[f'AÑO {col_fecha}'] = años
-            
-            # Guardar fechas como datetime para cálculos
-            df[f'{col_fecha}_DT'] = fechas_datetime
+# -------------------
+# Escritura con formato de miles en Excel
+# -------------------
+def guardar_excel_con_miles(df, output_path, columnas_montos, aplicar_formato=True):
+    # Quitar la columna LINEA_CLAVE si existe
+    if 'LINEA_CLAVE' in df.columns:
+        df = df.drop(columns=['LINEA_CLAVE'])
     
-    print("Fechas procesadas correctamente")
-    return df
-
-def calcular_dias_vencidos(df, fecha_cierre_str=None):
-    """Calcula días vencidos y días por vencer"""
-    print("Calculando días vencidos...")
-    
-    fecha_cierre = obtener_fecha_cierre(fecha_cierre_str)
-    
-    if 'FECHA VTO_DT' in df.columns and 'SALDO' in df.columns:
-        dias_vencidos = []
-        dias_por_vencer = []
-        
-        for fecha_vto in df['FECHA VTO_DT']:
-            if fecha_vto and pd.notna(fecha_vto):
-                dias_diff = (fecha_vto - fecha_cierre).days
-                if dias_diff < 0:
-                    # Vencido
-                    dias_vencidos.append(abs(dias_diff))
-                    dias_por_vencer.append(0)
-                else:
-                    # Por vencer
-                    dias_vencidos.append(0)
-                    dias_por_vencer.append(dias_diff)
-            else:
-                dias_vencidos.append(0)
-                dias_por_vencer.append(0)
-        
-        df['DIAS VENCIDO'] = dias_vencidos
-        df['DIAS POR VENCER'] = dias_por_vencer
-        
-        print("Días vencidos y por vencer calculados correctamente")
-    
-    return df
-
-def calcular_saldos_y_dotacion(df):
-    """Calcula saldo vencido, dotación y mora total"""
-    print("Calculando saldos y dotación...")
-    
-    if 'SALDO' in df.columns and 'DIAS VENCIDO' in df.columns:
-        # Saldo vencido
-        df['SALDO VENCIDO'] = df.apply(
-            lambda row: convertir_valor(row['SALDO']) if row['DIAS VENCIDO'] > 0 else 0, axis=1
-        )
-        
-        # % Dotación (100% si días vencidos >= 180)
-        df['% Dotación'] = df['DIAS VENCIDO'].apply(lambda x: '100%' if x >= 180 else '0%')
-        
-        # Valor Dotación (saldo si días vencidos >= 180)
-        df['  Valor Dotación  '] = df.apply(
-            lambda row: convertir_valor(row['SALDO']) if row['DIAS VENCIDO'] >= 180 else 0, axis=1
-        )
-        
-        # Mora Total (igual al saldo vencido)
-        df['Mora Total'] = df['SALDO VENCIDO']
-        
-        # Valor Total Por Vencer
-        df['Valor Total Por Vencer'] = df.apply(
-            lambda row: convertir_valor(row['SALDO']) if row['DIAS VENCIDO'] <= 0 else 0, axis=1
-        )
-        
-        print("Saldos y dotación calculados correctamente")
-    
-    return df
-
-
-def calcular_vencimientos_historicos(df, fecha_cierre_str=None):
-    """Calcula vencimientos históricos de los últimos 6 meses"""
-    print("Calculando vencimientos históricos...")
-    
-    fecha_cierre = obtener_fecha_cierre(fecha_cierre_str)
-    
-    if 'FECHA VTO_DT' in df.columns and 'SALDO' in df.columns:
-        # Configurar locale para nombres de meses en español
-        try:
-            locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
-        except:
+    # Asegurar que las columnas de montos sean numéricas
+    for col in columnas_montos:
+        if col in df.columns:
             try:
-                locale.setlocale(locale.LC_TIME, 'es_CO.UTF-8')
-            except:
-                locale.setlocale(locale.LC_TIME, '')
-        
-        # Calcular vencimientos de los últimos 6 meses
-        for i in range(1, 7):
-            inicio_mes = fecha_cierre - pd.DateOffset(months=i)
-            fin_mes = fecha_cierre - pd.DateOffset(months=i-1)
-            
-            # Nombre del mes en formato abreviado
-            nombre_mes = inicio_mes.strftime('%b-%y').lower()
-            
-            df[nombre_mes] = df.apply(
-                lambda row: convertir_valor(row['SALDO'])
-                if (row['FECHA VTO_DT'] and inicio_mes <= row['FECHA VTO_DT'] < fin_mes) 
-                else '-', axis=1
-            )
-        
-        print("Vencimientos históricos calculados correctamente")
-    
-    return df
-
-def calcular_vencimientos_por_rango(df):
-    """Calcula vencimientos por rango de días según especificaciones"""
-    print("Calculando vencimientos por rango...")
-    
-    if 'SALDO' in df.columns and 'DIAS VENCIDO' in df.columns:
-        for nombre_col, min_dias, max_dias in VENCIMIENTOS_RANGOS:
-            df[nombre_col] = df.apply(
-                lambda row: convertir_valor(row['SALDO'])
-                if min_dias <= row['DIAS VENCIDO'] <= max_dias 
-                else 0, axis=1
-            )
-        
-        print("Vencimientos por rango calculados correctamente")
-    
-    return df
-
-def calcular_por_vencer(df, fecha_cierre_str=None):
-    """Calcula valores por vencer de los próximos 3 meses"""
-    print("Calculando valores por vencer...")
-    
-    fecha_cierre = obtener_fecha_cierre(fecha_cierre_str)
-    
-    if 'FECHA VTO_DT' in df.columns and 'SALDO' in df.columns:
-        # Por vencer próximos 3 meses
-        for i in range(1, 4):
-            inicio_mes = fecha_cierre + pd.DateOffset(months=i-1)
-            fin_mes = fecha_cierre + pd.DateOffset(months=i)
-            
-            df[f'Por_Vencer_{i}_meses'] = df.apply(
-                lambda row: convertir_valor(row['SALDO'])
-                if (row['FECHA VTO_DT'] and inicio_mes <= row['FECHA VTO_DT'] < fin_mes) 
-                else 0, axis=1
-            )
-        
-        # Mayor a 90 días
-        fecha_90_dias = fecha_cierre + pd.DateOffset(days=90)
-        df['Por_Vencer_+90_dias'] = df.apply(
-            lambda row: convertir_valor(row['SALDO'])
-            if (row['FECHA VTO_DT'] and row['FECHA VTO_DT'] >= fecha_90_dias) 
-            else 0, axis=1
-        )
-        
-        print("Valores por vencer calculados correctamente")
-    
-    return df
-
-def validar_saldos(df):
-    """Valida que las sumas de saldos sean correctas"""
-    print("Validando saldos...")
-    
-    errores = []
-    
-    # Validar que Mora Total + Valor Total Por Vencer = Saldo
-    if all(col in df.columns for col in ['Mora Total', 'Valor Total Por Vencer', 'SALDO']):
-        df['Verificación Suma Saldos'] = df.apply(
-            lambda row: 'OK' if abs(row['Mora Total'] + row['Valor Total Por Vencer'] - convertir_valor(row['SALDO'])) < 0.01
-            else 'ERROR', axis=1
-        )
-        
-        errores_suma = (df['Verificación Suma Saldos'] == 'ERROR').sum()
-        if errores_suma > 0:
-            print(f"ADVERTENCIA: {errores_suma} registros con error en suma de saldos")
-            errores.append(f"Suma saldos: {errores_suma} errores")
-    
-    # Validar que suma de vencimientos = saldo
-    columnas_vencimiento = [col for col, _, _ in VENCIMIENTOS_RANGOS]
-    if all(col in df.columns for col in columnas_vencimiento) and 'SALDO' in df.columns:
-        df['Validación Vencimientos'] = df.apply(
-                lambda row: 'OK' if abs(sum([row[col] for col in columnas_vencimiento]) - convertir_valor(row['SALDO'])) < 0.01
-            else 'ERROR', axis=1
-        )
-        
-        errores_venc = (df['Validación Vencimientos'] == 'ERROR').sum()
-        if errores_venc > 0:
-            print(f"ADVERTENCIA: {errores_venc} registros con error en suma de vencimientos")
-            errores.append(f"Vencimientos: {errores_venc} errores")
-    
-    if errores:
-        print(f"Errores encontrados: {', '.join(errores)}")
-    else:
-        print("Todas las validaciones de saldos son correctas")
-    
-    return df
-
-def crear_deuda_incobrable(df):
-    """Crea la columna de deuda incobrable"""
-    print("Creando columna de deuda incobrable...")
-    
-    if '  Valor Dotación  ' in df.columns:
-        df['  DEUDA INCOBRABLE  '] = df['  Valor Dotación  ']
-        print("Columna de deuda incobrable creada correctamente")
-    
-    return df
-
-def aplicar_formato_final(df):
-    """Aplica el formato final al DataFrame"""
-    print("Aplicando formato final...")
-    
-    # Eliminar columnas de datetime que contienen información de tiempo
-    columnas_a_eliminar = [col for col in df.columns if col.endswith('_DT')]
-    if columnas_a_eliminar:
-        print(f"Eliminando columnas de datetime: {columnas_a_eliminar}")
-        df = df.drop(columns=columnas_a_eliminar)
-    
-    # Columnas numéricas que requieren formato colombiano
-    columnas_numericas = [
-        'SALDO', 'SALDO VENCIDO', '  Valor Dotación  ', 'Mora Total', 
-        'Valor Total Por Vencer', '  DEUDA INCOBRABLE  '
-    ]
-    
-    # Agregar columnas de vencimientos
-    columnas_numericas.extend([col for col, _, _ in VENCIMIENTOS_RANGOS])
-    
-    # Agregar columnas de vencimientos históricos
-    fecha_cierre = obtener_fecha_cierre()
-    for i in range(1, 7):
-        inicio_mes = fecha_cierre - pd.DateOffset(months=i)
-        nombre_mes = inicio_mes.strftime('%b-%y').lower()
-        columnas_numericas.append(nombre_mes)
-    
-    # Agregar columnas por vencer
-    for i in range(1, 4):
-        columnas_numericas.append(f'Por_Vencer_{i}_meses')
-    columnas_numericas.append('Por_Vencer_+90_dias')
-    
-    # Filtrar solo las columnas que existen en el DataFrame
-    columnas_existentes = [col for col in columnas_numericas if col in df.columns]
-    
-    # Aplicar formato colombiano
-    # df = aplicar_formato_colombiano_dataframe(df, columnas_existentes)  # Comentado porque no está definida
-    
-    # Reemplazar ceros por '-' en columnas numéricas (excepto porcentajes)
-    for col in columnas_existentes:
-        if '%' not in col:
-            df[col] = df[col].replace(['0', '0,00', '0.00', '0,0', '0.0'], '-')
-    
-    print("Formato final aplicado correctamente")
-    return df
-
-def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None):
-    """
-    Procesa el archivo de cartera según las especificaciones del formato de deuda.
-    """
-    print("=" * 80)
-    print("PROCESADOR DE CARTERA - FORMATO DEUDA")
-    print("=" * 80)
-
-    if fecha_cierre_str:
-        print(f"Fecha de cierre especificada: {fecha_cierre_str}")
-    else:
-        print("Usando fecha de cierre por defecto (último día del mes actual)")
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            except Exception:
+                pass
 
     try:
-        # Leer archivo CSV
-        print(f"Leyendo archivo: {input_path}")
-        df = pd.read_csv(input_path, sep=';', encoding='latin1', encoding_errors='strict', decimal=',', thousands='.', dtype=str)
-        print(f"Archivo leído correctamente. Registros: {len(df)}")
-
-        # Procesar datos
-        df = limpiar_y_validar_datos(df)
-        df = unificar_nombres_clientes(df)
-        df = procesar_fechas(df, fecha_cierre_str)
-        df = calcular_dias_vencidos(df, fecha_cierre_str)
-        df = calcular_saldos_y_dotacion(df)
-        df = calcular_vencimientos_historicos(df, fecha_cierre_str)
-        df = calcular_vencimientos_por_rango(df)
-        df = calcular_por_vencer(df, fecha_cierre_str)
-        df = validar_saldos(df)
-        df = crear_deuda_incobrable(df)
-        df = aplicar_formato_final(df)
-
-        # Definir carpeta de salida
-        output_dir = r'C:\wamp64\www\modelo-deuda-python\CARTERA_V2.0.0\PROVCA_PROCESADOS'
-        os.makedirs(output_dir, exist_ok=True)
-
-        if not output_path:
-            ahora = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-            output_path = os.path.join(output_dir, f'CARTERA_PROCESADA_{ahora}.xlsx')
-
-        # Verificar que el DataFrame no esté vacío
-        if df.empty:
-            print("ERROR: El DataFrame está vacío. No se puede generar archivo.")
-            return None
-
-        # Guardar archivo Excel
-        print(f"Guardando archivo: {output_path}")
-        df.to_excel(output_path, index=False)
-
-        # Verificar que el archivo se creó correctamente
-        if not os.path.exists(output_path):
-            print("ERROR: No se pudo crear el archivo Excel.")
-            return None
-        if os.path.getsize(output_path) == 0:
-            print("ERROR: El archivo Excel está vacío.")
-            os.remove(output_path)
-            return None
-
-        # Ajustar formato de Excel con formato contable colombiano
-        try:
-            from openpyxl import load_workbook
-            from openpyxl.styles import Alignment
-            wb = load_workbook(output_path)
-            ws = wb.active
-
-            # Ajustar alineación y formato monetario
-            for row in ws.iter_rows(min_row=2):  # Saltar encabezados
-                for cell in row:
-                    valor = cell.value
-                    if valor is None:
-                        cell.alignment = Alignment(horizontal='center', vertical='center')
-                    else:
-                        try:
-                            # Si es número
-                            float(str(valor).replace('.', '').replace(',', '').replace('%', ''))
-                            cell.alignment = Alignment(horizontal='right', vertical='center')
-                            cell.number_format = '"$"#,##0.00'  # Moneda COP
-                        except:
-                            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-            # Encabezados al centro
-            for cell in ws[1]:
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-
-            wb.save(output_path)
-            print("Formato de Excel ajustado correctamente con moneda COP")
-        except Exception as e:
-            print(f"Advertencia: No se pudo ajustar el formato de Excel: {e}")
-
-        # Resumen final
-        print("\n" + "=" * 80)
-        print("PROCESAMIENTO COMPLETADO EXITOSAMENTE")
-        print("=" * 80)
-        print(f"Archivo procesado: {input_path}")
-        print(f"Archivo generado: {output_path}")
-        print(f"Registros procesados: {len(df)}")
-        print(f"Columnas generadas: {len(df.columns)}")
-
-        # Mostrar columnas principales
-        columnas_principales = [
-            'EMPRESA', 'CODIGO CLIENTE', 'NOMBRE', 'DENOMINACION COMERCIAL',
-            'NUMERO FACTURA', 'FECHA VTO', 'SALDO', 'DIAS VENCIDO',
-            '% Dotación', '  Valor Dotación  ', 'Mora Total', 'Valor Total Por Vencer'
-        ]
-        print(f"\nColumnas principales: {[col for col in columnas_principales if col in df.columns]}")
-
-        return output_path
-
+        with pd.ExcelWriter(output_path, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Cartera")
+            if aplicar_formato:
+                ws = writer.sheets["Cartera"]
+                book = writer.book
+                
+                # Aplicar formato de miles sin decimales a todas las columnas de montos
+                fmt_miles = book.add_format({"num_format": "#,##0;-#,##0;\"-\";@"})
+                for col in columnas_montos:
+                    if col in df.columns:
+                        idx = df.columns.get_loc(col)
+                        ws.set_column(idx, idx, 18, fmt_miles)
+        return
     except Exception as e:
-        print(f"ERROR durante el procesamiento: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None
+        print(f"Error con xlsxwriter: {e}")
+        pass
 
+    # Fallback con openpyxl
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Cartera")
+        if aplicar_formato:
+            from openpyxl.utils import get_column_letter
+            ws = writer.sheets["Cartera"]
+            
+            for col in columnas_montos:
+                if col in df.columns:
+                    j = df.columns.get_loc(col) + 1
+                    letter = get_column_letter(j)
+                    
+                    for row in range(2, ws.max_row + 1):
+                        cell = ws[f"{letter}{row}"]
+                        if isinstance(cell.value, (int, float)) and cell.value != 0:
+                            # Forzar formato con miles sin decimales en todos los casos
+                            cell.number_format = "#,##0;-#,##0;\"-\";@"
 
+# -------------------
+# Procesador principal
+# -------------------
+def procesar_cartera(input_path, output_path=None, fecha_cierre_str=None, formatear_miles_excel=True, override_moneda=None):
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"No se encontró el archivo CSV: {input_path}")
+    df = pd.read_csv(input_path, sep=";", encoding="latin1", dtype=str, keep_default_na=False, na_values=[""])
+    df.rename(columns=RENOMBRES, inplace=True)
+    if "PCIMCO" in df.columns:
+        df.drop(columns=["PCIMCO"], inplace=True)
+
+    if "MONEDA" not in df.columns:
+        df["MONEDA"] = "PESOS COL"
+    if override_moneda and isinstance(override_moneda, str) and override_moneda.strip() != "":
+        df["MONEDA"] = override_moneda.strip()
+
+    df["SALDO"] = df.get("SALDO", 0).apply(convertir_valor_to_float)
+    df["VALOR"] = df.get("VALOR", 0).apply(convertir_valor_to_float)
+
+    # Rellenar DENOMINACION COMERCIAL con NOMBRE si está vacío (robusto ante espacios y \u200b)
+    if "DENOMINACION COMERCIAL" in df.columns and "NOMBRE" in df.columns:
+        df["DENOMINACION COMERCIAL"] = (
+            df["DENOMINACION COMERCIAL"].astype(str).str.replace("\u200b", "", regex=False).str.strip()
+        )
+        df["NOMBRE"] = (
+            df["NOMBRE"].astype(str).str.replace("\u200b", "", regex=False).str.strip()
+        )
+        mask_dc_vacia = df["DENOMINACION COMERCIAL"].isna() | (df["DENOMINACION COMERCIAL"].str.strip() == "")
+        mask_nombre_ok = df["NOMBRE"].notna() & (df["NOMBRE"].str.strip() != "")
+        df.loc[mask_dc_vacia & mask_nombre_ok, "DENOMINACION COMERCIAL"] = df.loc[mask_dc_vacia & mask_nombre_ok, "NOMBRE"]
+
+    for col in ["FECHA", "FECHA VTO"]:
+        if col in df.columns:
+            df[col] = parse_fecha_segura(df[col])
+
+    fecha_cierre = obtener_fecha_cierre(fecha_cierre_str)
+    if "FECHA VTO" in df.columns:
+        df["DIAS VENCIDO"] = df["FECHA VTO"].apply(lambda fv: max((fecha_cierre - fv).days, 0) if pd.notna(fv) else 0).astype(int)
+        df["DIAS POR VENCER"] = df["FECHA VTO"].apply(lambda fv: max((fv - fecha_cierre).days, 0) if pd.notna(fv) else 0).astype(int)
+    else:
+        df["DIAS VENCIDO"] = 0
+        df["DIAS POR VENCER"] = 0
+
+    df["SALDO VENCIDO"] = df.apply(lambda r: r["SALDO"] if r["DIAS VENCIDO"] > 0 else 0.0, axis=1)
+    df["% Dotación"] = df["DIAS VENCIDO"].apply(lambda x: "100%" if x >= 180 else "0%")
+    df["Valor Dotación"] = df.apply(lambda r: r["SALDO"] if r["DIAS VENCIDO"] >= 180 else 0.0, axis=1)
+    df["Mora Total"] = df["SALDO VENCIDO"]
+    df["Valor Total Por Vencer"] = df.apply(lambda r: r["SALDO"] if r["DIAS VENCIDO"] == 0 else 0.0, axis=1)
+    df[">=180 días"] = df.apply(lambda r: r["SALDO"] if r["DIAS VENCIDO"] >= 180 else 0.0, axis=1)
+
+    # Meses históricos desde la fecha de cierre
+    meses_hist = []
+    for i in range(0, 6):
+        mes_fecha = (fecha_cierre - pd.DateOffset(months=i)).replace(day=1)
+        siguiente_mes = mes_fecha + pd.DateOffset(months=1)
+        col = mes_fecha.strftime("%b-%y").lower()
+        meses_hist.append(col)
+        df[col] = df.apply(lambda r, a=mes_fecha, b=siguiente_mes: r["SALDO"] if (pd.notna(r["FECHA VTO"]) and (a <= r["FECHA VTO"] < b)) else 0.0, axis=1)
+
+    # Por vencer
+    por_vencer_cols = []
+    for i in range(1, 4):
+        a = fecha_cierre + pd.DateOffset(months=i)
+        b = fecha_cierre + pd.DateOffset(months=i + 1)
+        col = f"Por_Vencer_{i}_meses"
+        por_vencer_cols.append(col)
+        df[col] = df.apply(lambda r, a=a, b=b: r["SALDO"] if (pd.notna(r["FECHA VTO"]) and (a <= r["FECHA VTO"] < b)) else 0.0, axis=1)
+
+    fecha_90 = fecha_cierre + pd.DateOffset(days=90)
+    df["Por_Vencer_+90_dias"] = df.apply(lambda r: r["SALDO"] if (pd.notna(r["FECHA VTO"]) and r["FECHA VTO"] >= fecha_90) else 0.0, axis=1)
+
+    for name, mind, maxd in VENCIMIENTOS_RANGOS:
+        df[name] = df.apply(lambda r, mind=mind, maxd=maxd: r["SALDO"] if (mind <= r["DIAS VENCIDO"] <= maxd) else 0.0, axis=1)
+
+    df["DEUDA INCOBRABLE"] = df["Valor Dotación"]
+
+    if "FECHA" in df.columns:
+        df["DIA FECHA"] = df["FECHA"].dt.day.fillna(0).astype(int)
+        df["MES FECHA"] = df["FECHA"].dt.month.fillna(0).astype(int)
+        df["AÑO FECHA"] = df["FECHA"].dt.year.fillna(0).astype(int)
+        df["FECHA"] = df["FECHA"].apply(formato_fecha_str)
+    if "FECHA VTO" in df.columns:
+        df["DIA FECHA VTO"] = df["FECHA VTO"].dt.day.fillna(0).astype(int)
+        df["MES FECHA VTO"] = df["FECHA VTO"].dt.month.fillna(0).astype(int)
+        df["AÑO FECHA VTO"] = df["FECHA VTO"].dt.year.fillna(0).astype(int)
+        df["FECHA VTO"] = df["FECHA VTO"].apply(formato_fecha_str)
+
+    base_cols = [
+        "EMPRESA", "ACTIVIDAD", "EMPRESA_2", "CODIGO AGENTE", "AGENTE",
+        "CODIGO COBRADOR", "COBRADOR", "CODIGO CLIENTE", "IDENTIFICACION",
+        "NOMBRE", "DENOMINACION COMERCIAL", "DIRECCION", "TELEFONO", "CIUDAD",
+        "NUMERO FACTURA", "TIPO", "MONEDA"
+    ]
+    fechas_cols = []
+    if "FECHA" in df.columns:
+        fechas_cols += ["FECHA", "DIA FECHA", "MES FECHA", "AÑO FECHA"]
+    if "FECHA VTO" in df.columns:
+        fechas_cols += ["FECHA VTO", "DIA FECHA VTO", "MES FECHA VTO", "AÑO FECHA VTO"]
+
+    fin_cols = ["VALOR", "SALDO", "DIAS VENCIDO", "DIAS POR VENCER", "SALDO VENCIDO",
+                "% Dotación", "Valor Dotación", "Mora Total", "Valor Total Por Vencer", ">=180 días"]
+
+    final_cols = base_cols + fechas_cols + fin_cols + meses_hist + por_vencer_cols + ["Por_Vencer_+90_dias"] + [v[0] for v in VENCIMIENTOS_RANGOS] + ["DEUDA INCOBRABLE"]
+
+    df = df[[c for c in final_cols if c in df.columns]]
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+    if not output_path:
+        output_path = os.path.join(OUT_DIR, f"{base_name}_cartera_{timestamp}.xlsx")
+    elif os.path.isdir(output_path):
+        output_path = os.path.join(output_path, f"{base_name}_cartera_{timestamp}.xlsx")
+
+    columnas_montos = ["VALOR", "SALDO", "SALDO VENCIDO", "Valor Dotación", "Mora Total",
+                       "Valor Total Por Vencer", "DEUDA INCOBRABLE", ">=180 días"] + meses_hist + por_vencer_cols + ["Por_Vencer_+90_dias"] + [v[0] for v in VENCIMIENTOS_RANGOS]
+
+    # Eliminar filas sin información monetaria (todos los montos en 0)
+    monto_cols_presentes = [c for c in columnas_montos if c in df.columns]
+    if monto_cols_presentes:
+        df = df[df[monto_cols_presentes].abs().sum(axis=1) != 0]
+
+    guardar_excel_con_miles(df, output_path, columnas_montos, aplicar_formato=formatear_miles_excel)
+    print(f"✅ Archivo generado: {output_path}")
+    return output_path
+
+# -------------------
+# CLI
+# -------------------
 def menu():
-    while True:
-        print("\n=== PROCESADOR DE CARTERA ===")
-        print("1. Procesar archivo CSV")
-        print("2. Salir")
-        opcion = input("Seleccione una opción: ")
-        
-        if opcion == "1":
-            ruta = input("Ruta del archivo CSV: ").strip()
-            fecha = input("Fecha de cierre (YYYY-MM-DD, opcional): ").strip() or None
-            salida = input("Ruta de salida (opcional): ").strip() or None
-            procesar_cartera(ruta, salida, fecha)
-        elif opcion == "2":
-            break
-        else:
-            print("Opción no válida.")
-
-
-def procesar_archivo(input_file, fecha_cierre=None, output_file=None):
-    """
-    Ejecuta el procesamiento sin menú, pensado para ser llamado desde PHP u otro sistema.
-    """
-    return procesar_cartera(input_file, output_file, fecha_cierre)
+    print("=== Menú de Procesamiento de Cartera ===")
+    input_path = input("Ruta del archivo CSV: ").strip()
+    output_path = input("Ruta de salida (opcional): ").strip() or None
+    fecha_cierre_str = input("Fecha de cierre EXACTA (YYYY-MM-DD, vacío = hoy): ").strip() or None
+    cfg = load_trm()
+    print(f"TRM guardadas → USD: {format_trm_display(cfg.get('usd'))} | EUR: {format_trm_display(cfg.get('eur'))} (actualizado: {cfg.get('updated_at')})")
+    try:
+        actualizar = input("¿Desea actualizar TRM para que la usen los demás procesos? (s/n): ").strip().lower()
+    except Exception:
+        actualizar = 'n'
+    if actualizar == 's':
+        usd_txt = input("TRM Dólar (deje vacío para mantener): ").strip()
+        eur_txt = input("TRM Euro (deje vacío para mantener): ").strip()
+        try:
+            new_usd = parse_trm_value(usd_txt, cfg.get('usd'))
+            new_eur = parse_trm_value(eur_txt, cfg.get('eur'))
+            save_trm(new_usd, new_eur)
+            print(f"✅ TRM guardadas. USD: {format_trm_display(new_usd)} | EUR: {format_trm_display(new_eur)}")
+        except Exception as e:
+            print(f"⚠ No se pudieron guardar las TRM: {e}")
+    try:
+        # Siempre aplicar formato de miles en Excel
+        ruta_salida = procesar_cartera(input_path, output_path, fecha_cierre_str, True)
+        print("Procesamiento completado exitosamente")
+        print(f"Ruta de salida: {ruta_salida}")
+    except Exception as e:
+        print("ERROR:", e)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        input_file = sys.argv[1]
-        fecha_cierre = sys.argv[2] if len(sys.argv) > 2 else None
-        output_file = sys.argv[3] if len(sys.argv) > 3 else None
-        resultado = procesar_archivo(input_file, fecha_cierre, output_file)
-        if resultado:
-            print(f"Archivo procesado correctamente: {resultado}")
-        else:
-            print("Error procesando el archivo.")
+        try:
+            procesar_cartera(
+                sys.argv[1],
+                sys.argv[2] if len(sys.argv) > 2 else None,
+                sys.argv[3] if len(sys.argv) > 3 else None,
+                ((len(sys.argv) > 4) and (str(sys.argv[4]).strip().lower() == "s")) or True,
+                sys.argv[5] if len(sys.argv) > 5 else None,
+            )
+            # Si se pasaron TRM por CLI, guardarlas para uso global
+            if len(sys.argv) > 6:
+                try:
+                    usd_cli = float(str(sys.argv[5]).replace(',', '.'))
+                    eur_cli = float(str(sys.argv[6]).replace(',', '.'))
+                    save_trm(usd_cli, eur_cli)
+                    print(f"ℹ TRM guardadas desde CLI. USD: {usd_cli} | EUR: {eur_cli}")
+                except Exception as e:
+                    print(f"⚠ TRM por CLI inválidas: {e}")
+        except Exception as e:
+            print("ERROR:", e)
     else:
         menu()
-

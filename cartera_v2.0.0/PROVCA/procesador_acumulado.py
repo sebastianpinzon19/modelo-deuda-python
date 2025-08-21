@@ -7,14 +7,12 @@ Versión: 2.0.1
 """
 
 import pandas as pd
-import numpy as np
 import os
 import sys
 import time
-from datetime import datetime
-from typing import Tuple, Dict, Any, List, Optional, Union
-from config import (
-    TIPOS_PROCESAMIENTO, CONFIG_PROCESAMIENTO, DIRECTORIOS,
+from typing import Tuple, Dict
+from config_acumulado import (
+    CONFIG_PROCESAMIENTO, DIRECTORIOS,
     obtener_timestamp, obtener_fecha_actual
 )
 from logger import crear_logger, log_funcion

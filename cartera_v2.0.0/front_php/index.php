@@ -241,57 +241,59 @@
             <p>Sistema de procesamiento de cartera y anticipos - Grupo Planeta</p>
         </div>
 
-        <!-- Botones principales -->
-        <div class="main-buttons">
-            <a href="cartera.php" class="main-button cartera">
-                <div class="button-icon">
-                    <i class="fas fa-file-invoice-dollar"></i>
+        <!-- Panel único con selector y acciones -->
+        <div class="main-buttons" style="display:block;">
+            <div class="main-button" style="max-width:900px;margin:0 auto;gap:20px;">
+                <div class="button-icon" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);">
+                    <i class="fas fa-sliders-h"></i>
                 </div>
-                <div class="button-content">
-                    <h3>Cartera (Provisión)</h3>
-                    <p>Procesa archivos PROVCA.CSV</p>
+                <div class="button-content" style="width:100%;">
+                    <h3 style="margin-bottom:12px;">Selecciona el proceso</h3>
+                    <p style="margin-bottom:16px;">Según la opción, aparecen las acciones disponibles.</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+                        <label for="procesoSelect" style="font-weight:600;color:#1f2937;">Proceso:</label>
+                        <select id="procesoSelect" style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid #d1d5db;background:#fff;font-weight:600;">
+                            <option value="cartera">Cartera (Provisión)</option>
+                            <option value="anticipos">Anticipos</option>
+                            <option value="modelo">Modelo Deuda</option>
+                            <option value="balance">Balance</option>
+                        </select>
                 </div>
-            </a>
 
-            <a href="anticipos.php" class="main-button anticipo">
-                <div class="button-icon">
-                    <i class="fas fa-hand-holding-usd"></i>
+                    <!-- Acciones dinámicas -->
+                    <div id="acciones" style="margin-top:18px;display:flex;flex-wrap:wrap;gap:12px;"></div>
+                    <!-- TRM para Modelo Deuda -->
+                    <div id="trmBox" class="trm-container" style="display:none;">
+                        <div class="trm-header">
+                            <h4 class="trm-title">
+                                <i class="fas fa-exchange-alt"></i> Tasas de Cambio (TRM)
+                            </h4>
+                            <div class="trm-subtitle">Ingresa las tasas de cambio para las conversiones de moneda</div>
+                        </div>
+                        <div class="trm-fields">
+                            <div class="trm-field">
+                                <label class="trm-label">
+                                    <i class="fas fa-dollar-sign"></i> Dólar (USD/COP)
+                                </label>
+                                <input id="trmUsd" type="number" step="0.01" min="0" placeholder="Ej: 4000" class="trm-input">
+                            </div>
+                            <div class="trm-field">
+                                <label class="trm-label">
+                                    <i class="fas fa-euro-sign"></i> Euro (EUR/COP)
+                                </label>
+                                <input id="trmEur" type="number" step="0.01" min="0" placeholder="Ej: 4700" class="trm-input">
+                            </div>
+                            <div class="trm-field">
+                                <button id="btnGuardarTRM" type="button" class="trm-save-btn">
+                                    <i class="fas fa-save"></i> Guardar TRM
+                                </button>
+                            </div>
+                        </div>
+                        <div id="trmStatus" class="trm-status info"></div>
+                    </div>
+                    <div id="resultado" style="margin-top:10px;width:100%;"></div>
                 </div>
-                <div class="button-content">
-                    <h3>Anticipos</h3>
-                    <p>Procesa archivos de anticipos</p>
                 </div>
-            </a>
-
-            <a href="modelo.php" class="main-button modelo">
-                <div class="button-icon">
-                    <i class="fas fa-calculator"></i>
-                </div>
-                <div class="button-content">
-                    <h3>Modelo Deuda</h3>
-                    <p>Genera modelo de deuda</p>
-                </div>
-            </a>
-
-            <a href="balance.php" class="main-button balance">
-                <div class="button-icon">
-                    <i class="fas fa-balance-scale"></i>
-                </div>
-                <div class="button-content">
-                    <h3>Procesador Balance</h3>
-                    <p>Análisis de cuentas y cálculos financieros</p>
-                </div>
-            </a>
-            <a href="http://localhost/cartera%20v1.0.0/cartera/front_php/procesar_balance_completo.php" class="main-button balance">
-                <div class="button-icon">
-                    <i class="fas fa-balance-scale"></i>
-                </div>
-                <div class="button-content">
-                    <h3>Prueba Cartera 2</h3>
-                    <p>Más detalles sobre el sistema</p>
-                </div>
-            </a>
-            
         </div>
     </div>
 
@@ -399,6 +401,251 @@
             };
             
             setTimeout(typeWriter, 500);
+        }
+
+        // Acciones dinámicas por proceso
+        const acciones = document.getElementById('acciones');
+        const select = document.getElementById('procesoSelect');
+        const trmBox = document.getElementById('trmBox');
+        const trmUsd = document.getElementById('trmUsd');
+        const trmEur = document.getElementById('trmEur');
+        const resultado = document.getElementById('resultado');
+
+        function btn(label, icon, action){
+            return `
+                <button data-action="${action}" class="main-button" style="min-height:auto;padding:14px 16px;gap:10px;cursor:pointer;">
+                    <div class="button-icon" style="width:56px;height:56px;font-size:1.2rem;background:#3b82f6;">
+                        <i class="${icon}"></i>
+                    </div>
+                    <div class="button-content"><h3 style="margin:0;">${label}</h3></div>
+                </button>
+            `;
+        }
+
+        const templates = {
+            cartera: `
+                <form id="formCartera" class="main-button" style="min-height:auto;padding:18px 20px;gap:12px;">
+                    <div class="button-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                    <div class="button-content" style="width:100%">
+                        <h3 style="margin-bottom:8px;">Generar Cartera</h3>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                            <input type="file" name="archivo" accept=".csv" required style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;">
+                            <select name="moneda" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;">
+                                <option value="">Moneda (por defecto)</option>
+                                <option value="PESOS COL">PESOS COL</option>
+                                <option value="USD">USD</option>
+                                <option value="EURO">EURO</option>
+                            </select>
+                            <button type="submit" class="main-button" style="min-height:auto;padding:10px 14px;background:#3b82f6;color:#fff;cursor:pointer;">
+                                <div class="button-content"><h3 style="margin:0;">Generar</h3></div>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            `,
+            anticipos: btn('Generar Anticipos','fas fa-hand-holding-usd','anticipos'),
+            modelo: `
+                <form id="formModelo" class="main-button" style="min-height:auto;padding:18px 20px;gap:12px;">
+                    <div class="button-icon"><i class="fas fa-calculator"></i></div>
+                    <div class="button-content" style="width:100%">
+                        <h3 style="margin-bottom:8px;">Generar Modelo Deuda</h3>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                            <label style="font-weight:600;color:#1f2937;">Cartera:</label>
+                            <input type="file" name="cartera" accept=".xlsx" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;">
+                            <label style="font-weight:600;color:#1f2937;">Anticipos:</label>
+                            <input type="file" name="anticipos" accept=".xlsx" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;">
+                            <button type="submit" class="main-button" style="min-height:auto;padding:10px 14px;background:#3b82f6;color:#fff;cursor:pointer;">
+                                <div class="button-content"><h3 style="margin:0;">Generar</h3></div>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            `,
+            balance: `<a href="balance.php" class="main-button balance" style="min-height:auto;padding:18px 20px;">
+                        <div class=\"button-icon\"><i class=\"fas fa-balance-scale\"></i></div>
+                        <div class=\"button-content\"><h3>Procesar Balance</h3><p>Análisis de cuentas</p></div>
+                      </a>`
+        };
+
+        async function fetchTRM(){
+            try{
+                const res = await fetch('runner.php',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'accion=trm'});
+                const json = await res.json();
+                if(json.ok){
+                    trmUsd.value = json.trm_usd ?? '';
+                    trmEur.value = json.trm_eur ?? '';
+                    updateTRMStatus();
+                }
+            }catch(err){
+                console.error('Error cargando TRM:', err);
+            }
+        }
+
+        async function guardarTRM(){
+            const usd = trmUsd.value.trim();
+            const eur = trmEur.value.trim();
+            
+            // Validación
+            if (!usd && !eur) {
+                showTRMStatus('Por favor ingresa al menos una tasa de cambio', 'error');
+                return;
+            }
+            
+            if (usd && (isNaN(parseFloat(usd)) || parseFloat(usd) <= 0)) {
+                showTRMStatus('El TRM del Dólar debe ser un número válido mayor a 0', 'error');
+                trmUsd.focus();
+                return;
+            }
+            
+            if (eur && (isNaN(parseFloat(eur)) || parseFloat(eur) <= 0)) {
+                showTRMStatus('El TRM del Euro debe ser un número válido mayor a 0', 'error');
+                trmEur.focus();
+                return;
+            }
+            
+            try {
+                const params = new URLSearchParams();
+                params.set('accion', 'guardar_trm');
+                if (usd) params.set('trm_usd', usd);
+                if (eur) params.set('trm_eur', eur);
+                
+                const res = await fetch('runner.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: params.toString()
+                });
+                
+                const json = await res.json();
+                if (json.ok) {
+                    showTRMStatus('Tasas de cambio guardadas correctamente', 'success');
+                    // Actualizar valores en los campos
+                    trmUsd.value = json.trm_usd ?? usd;
+                    trmEur.value = json.trm_eur ?? eur;
+                } else {
+                    showTRMStatus('Error al guardar: ' + (json.error || 'Error desconocido'), 'error');
+                }
+            } catch (err) {
+                showTRMStatus('Error de conexión al guardar', 'error');
+                console.error('Error guardando TRM:', err);
+            }
+        }
+
+        function showTRMStatus(message, type = 'info') {
+            const status = document.getElementById('trmStatus');
+            status.className = `trm-status ${type}`;
+            status.textContent = message;
+            
+            // Auto-limpiar mensajes de éxito después de 3 segundos
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.textContent = '';
+                    status.className = 'trm-status info';
+                }, 3000);
+            }
+        }
+
+        function updateTRMStatus() {
+            const usd = trmUsd.value.trim();
+            const eur = trmEur.value.trim();
+            
+            if (usd && eur) {
+                showTRMStatus(`TRM configurada: USD=${usd} | EUR=${eur}`, 'info');
+            } else if (usd) {
+                showTRMStatus(`TRM configurada: USD=${usd}`, 'info');
+            } else if (eur) {
+                showTRMStatus(`TRM configurada: EUR=${eur}`, 'info');
+            } else {
+                showTRMStatus('Ingresa las tasas de cambio para continuar', 'info');
+            }
+        }
+
+        function renderAcciones() {
+            const v = select.value;
+            acciones.innerHTML = templates[v] || '';
+            
+            // Mostrar TRM para todos los procesos, no solo modelo
+            trmBox.style.display = 'flex';
+            
+            // Cargar TRM y configurar event listeners para todos los procesos
+            fetchTRM();
+            setTimeout(() => {
+                const btnGuardarTRM = document.getElementById('btnGuardarTRM');
+                if (btnGuardarTRM) {
+                    // Remover event listeners previos para evitar duplicados
+                    btnGuardarTRM.removeEventListener('click', guardarTRM);
+                    btnGuardarTRM.addEventListener('click', guardarTRM);
+                }
+                
+                // Event listeners para validación en tiempo real
+                trmUsd.removeEventListener('input', updateTRMStatus);
+                trmEur.removeEventListener('input', updateTRMStatus);
+                trmUsd.addEventListener('input', updateTRMStatus);
+                trmEur.addEventListener('input', updateTRMStatus);
+                
+                // Efectos visuales en los campos
+                [trmUsd, trmEur].forEach(input => {
+                    input.removeEventListener('focus', function() {
+                        this.style.borderColor = '#3b82f6';
+                    });
+                    input.removeEventListener('blur', function() {
+                        this.style.borderColor = '#d1d5db';
+                    });
+                    input.addEventListener('focus', function() {
+                        this.style.borderColor = '#3b82f6';
+                    });
+                    input.addEventListener('blur', function() {
+                        this.style.borderColor = '#d1d5db';
+                    });
+                });
+            }, 100);
+        }
+        if (acciones && select) {
+            renderAcciones();
+            select.addEventListener('change', renderAcciones);
+            acciones.addEventListener('click', async (e)=>{
+                const b = e.target.closest('button[data-action]');
+                if(!b) return;
+                const accion = b.getAttribute('data-action');
+                resultado.innerHTML = '<span style="color:#1f2937;">Procesando...</span>';
+                try{
+                    const params = new URLSearchParams();
+                    params.set('accion', accion);
+                    // Enviar TRM para todos los procesos, no solo modelo
+                    if (trmUsd.value) params.set('trm_usd', trmUsd.value);
+                    if (trmEur.value) params.set('trm_eur', trmEur.value);
+                    const res = await fetch('runner.php',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params.toString()});
+                    const json = await res.json();
+                    if(json.ok){
+                        const trm = (json.trm_usd||json.trm_eur) ? ` <span style='color:#111827;font-weight:600;'>TRM USD=${json.trm_usd ?? '-'} | EUR=${json.trm_eur ?? '-'}</span>` : '';
+                        resultado.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;"><a class="main-button" style="min-height:auto;padding:12px 16px;background:#10b981;color:#fff;" href="${json.url}" target="_blank"><div class=\"button-content\"><h3 style=\"margin:0;\"><i class=\"fas fa-download\"></i> Descargar ${json.file}</h3></div></a><div>${trm}</div></div>`;
+                    }else{
+                        resultado.innerHTML = `<div style="color:#b91c1c;font-weight:700;">${json.error}</div>`;
+                    }
+                }catch(err){
+                    resultado.innerHTML = `<div style="color:#b91c1c;font-weight:700;">Error de conexión</div>`;
+                }
+            });
+            // submit cartera (con archivo y moneda)
+            acciones.addEventListener('submit', async (e)=>{
+                const form = e.target.closest('#formCartera');
+                if(!form) return;
+                e.preventDefault();
+                const fd = new FormData(form);
+                fd.set('accion','cartera');
+                resultado.innerHTML = '<span style="color:#1f2937;">Procesando...</span>';
+                try{
+                    const res = await fetch('runner.php',{method:'POST',body:fd});
+                    const json = await res.json();
+                    if(json.ok){
+                        const trm = (json.trm_usd||json.trm_eur) ? ` <span style='color:#111827;font-weight:600;'>TRM USD=${json.trm_usd ?? '-'} | EUR=${json.trm_eur ?? '-'}</span>` : '';
+                        resultado.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;"><a class="main-button" style="min-height:auto;padding:12px 16px;background:#10b981;color:#fff;" href="${json.url}" target="_blank"><div class=\"button-content\"><h3 style=\"margin:0;\"><i class=\"fas fa-download\"></i> Descargar ${json.file}</h3></div></a><div>${trm}</div></div>`;
+                    }else{
+                        resultado.innerHTML = `<div style="color:#b91c1c;font-weight:700;">${json.error}</div>`;
+                    }
+                }catch(err){
+                    resultado.innerHTML = `<div style="color:#b91c1c;font-weight:700;">Error de conexión</div>`;
+                }
+            });
         }
     </script>
 </body>

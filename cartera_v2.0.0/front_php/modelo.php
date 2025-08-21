@@ -94,16 +94,25 @@
 
                 <div class="form-group">
                     <label class="form-label">
-                        <i class="fas fa-dollar-sign"></i> TRM Dólar (USD/COP)
+                        <i class="fas fa-exchange-alt"></i> Tasas de Cambio (TRM)
                     </label>
-                    <input type="text" name="trm_dolar" class="form-input" placeholder="Ej: 4000" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-euro-sign"></i> TRM Euro (EUR/COP)
-                    </label>
-                    <input type="text" name="trm_euro" class="form-input" placeholder="Ej: 4300" required>
+                    <div class="trm-fields">
+                        <div class="trm-field">
+                            <label class="trm-label">
+                                <i class="fas fa-dollar-sign"></i> Dólar (USD/COP)
+                            </label>
+                            <input type="number" name="trm_dolar" class="trm-input" step="0.01" min="0" placeholder="Ej: 4000" required>
+                        </div>
+                        <div class="trm-field">
+                            <label class="trm-label">
+                                <i class="fas fa-euro-sign"></i> Euro (EUR/COP)
+                            </label>
+                            <input type="number" name="trm_euro" class="trm-input" step="0.01" min="0" placeholder="Ej: 4700" required>
+                        </div>
+                    </div>
+                    <small style="color:#6b7280;font-size:12px;margin-top:4px;display:block;">
+                        Ingresa las tasas de cambio para las conversiones de moneda en el modelo de deuda
+                    </small>
                 </div>
 
                 <button type="submit" class="btn btn-primary" id="btn-modelo">
@@ -351,14 +360,14 @@
                 } else if (!trmDolar || trmDolar.trim() === '') {
                     showToast('Por favor ingresa el TRM del Dólar', 'error');
                     isValid = false;
-                } else if (isNaN(parseFloat(trmDolar))) {
-                    showToast('El TRM del Dólar debe ser un número válido', 'error');
+                } else if (isNaN(parseFloat(trmDolar)) || parseFloat(trmDolar) <= 0) {
+                    showToast('El TRM del Dólar debe ser un número válido mayor a 0', 'error');
                     isValid = false;
                 } else if (!trmEuro || trmEuro.trim() === '') {
                     showToast('Por favor ingresa el TRM del Euro', 'error');
                     isValid = false;
-                } else if (isNaN(parseFloat(trmEuro))) {
-                    showToast('El TRM del Euro debe ser un número válido', 'error');
+                } else if (isNaN(parseFloat(trmEuro)) || parseFloat(trmEuro) <= 0) {
+                    showToast('El TRM del Euro debe ser un número válido mayor a 0', 'error');
                     isValid = false;
                 }
                 

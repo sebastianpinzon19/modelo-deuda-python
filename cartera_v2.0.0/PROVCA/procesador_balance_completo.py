@@ -1,240 +1,94 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Procesador de Balance Completo
-Sistema de Procesamiento de Cartera - Grupo Planeta
+Procesador de Balance 
+- Limpia y normaliza el balance por División/Cuenta
+- (Reglas genéricas y tolerantes; ajusta encabezados flexibles)
+- Guarda salidas en PROVCA_PROCESADOS
 """
 
+import os
+import re
 import pandas as pd
-import numpy as np
-import sys
 from datetime import datetime
-from utilidades_cartera import UtilidadesCartera
 
-def procesar_balance_completo(ruta_archivo):
-    """
-    Procesa archivo de balance completo según reglas de negocio (solo cuentas y sumas requeridas).
-    """
-    util = UtilidadesCartera()
+OUTPUT_DIR = r"C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\PROVCA_PROCESADOS"
+
+def asegurar_directorio(path_dir: str):
+    os.makedirs(path_dir, exist_ok=True)
+
+def timestamp():
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+def convertir_valor(valor):
     try:
-        util.validar_archivo(ruta_archivo)
-        df = util.leer_archivo(ruta_archivo)
-        df = util.limpiar_dataframe(df)
-        df.columns = df.columns.str.strip().str.upper()
-        # Filtrar cuentas requeridas y sumar columna 'SALDO AAF VARIACION'
-        cuentas_objeto = [
-            '43001', '0080.43002.20', '0080.43002.21', '0080.43002.15', '0080.43002.28',
-            '0080.43002.31', '0080.43002.63', '43008', '43042'
-        ]
-        col_cuenta = next((c for c in df.columns if 'CUENTA' in c), None)
-        col_saldo = next((c for c in df.columns if 'SALDO AAF VARIACION' in c), None)
-        if not col_cuenta or not col_saldo:
-            raise Exception('No se encontraron columnas de cuenta o saldo requeridas')
-        resumen = {}
-        for cuenta in cuentas_objeto:
-            mask = df[col_cuenta].astype(str).str.strip() == cuenta
-            total = df.loc[mask, col_saldo].sum()
-            resumen[cuenta] = total
-        df_resumen = pd.DataFrame(list(resumen.items()), columns=['CUENTA_OBJETO','TOTAL_SALDO_AAF_VARIACION'])
-        # Guardar resultado
-        nombre_salida = util.generar_nombre_archivo_salida("balance_completo_procesado")
-        ruta_salida = util.obtener_ruta_resultado(nombre_salida)
-        util.escribir_resultado(df_resumen, ruta_salida)
-        return ruta_salida, resumen
-    except Exception as e:
-        print(f"Error en procesamiento de balance completo: {e}")
-        raise
+        if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+            return 0.0
+        if isinstance(valor, (int, float)):
+            return float(valor)
+        s = str(valor).strip().replace('\u200b','').replace(' ','')
+        if s == '' or s.lower() == 'nan':
+            return 0.0
+        if '.' in s and ',' in s:
+            s = s.replace('.', '').replace(',', '.')
+        elif ',' in s and '.' not in s:
+            s = s.replace(',', '.')
+        return float(s)
+    except Exception:
+        return 0.0
 
-def procesar_datos_balance(df):
-    """
-    Procesa los datos de balance
-    """
-    # Copiar dataframe original
-    df_procesado = df.copy()
-    df_procesado.columns = df_procesado.columns.str.strip().str.upper()
-    # Limpiar texto
-    columnas_texto = df_procesado.select_dtypes(include=['object']).columns
-    for columna in columnas_texto:
-        df_procesado[columna] = df_procesado[columna].apply(limpiar_texto)
-    
-    def limpiar_texto(valor):
-        """
-        Limpia y normaliza texto eliminando espacios y convirtiendo a mayúsculas.
-        """
-        if pd.isna(valor):
-            return valor
-        return str(valor).strip().upper()
-    # Convertir numéricos
-    for columna in df_procesado.columns:
-        df_procesado[columna] = pd.to_numeric(df_procesado[columna], errors='ignore')
-    # Filtrar cuentas requeridas
-    cuentas_objeto = [
-        '43001', '0080.43002.20', '0080.43002.21', '0080.43002.15', '0080.43002.28',
-        '0080.43002.31', '0080.43002.63', '43008', '43042'
-    ]
-    # Buscar columna de cuenta y saldo
-    col_cuenta = next((c for c in df_procesado.columns if 'CUENTA' in c), None)
-    col_saldo = next((c for c in df_procesado.columns if 'SALDO AAF VARIACION' in c), None)
-    if not col_cuenta or not col_saldo:
-        raise Exception('No se encontraron columnas de cuenta o saldo requeridas')
-    # Filtrar y sumar
-    resumen = {}
-    for cuenta in cuentas_objeto:
-        mask = df_procesado[col_cuenta].astype(str).str.strip() == cuenta
-        total = df_procesado.loc[mask, col_saldo].sum()
-        resumen[cuenta] = total
-    # Crear dataframe resumen
-    df_resumen = pd.DataFrame(list(resumen.items()), columns=['CUENTA_OBJETO','TOTAL_SALDO_AAF_VARIACION'])
-    # Estructura de salida
-    return df_resumen
+def leer_balance(ruta_excel: str) -> pd.DataFrame:
+    xls = pd.ExcelFile(ruta_excel)
+    frames = []
+    for hoja in xls.sheet_names:
+        try:
+            df = pd.read_excel(ruta_excel, sheet_name=hoja, dtype=str)
+            if df.empty:
+                continue
+            df.columns = [str(c).strip().upper() for c in df.columns]
+            df["__HOJA__"] = hoja
+            frames.append(df)
+        except Exception:
+            continue
+    if not frames:
+        raise ValueError("No se pudieron leer hojas válidas del Balance.")
+    return pd.concat(frames, ignore_index=True)
 
-def agregar_columnas_balance(df):
-    """
-    Agrega columnas calculadas específicas para balance
-    """
-    # Buscar columnas de saldo y balance
-    columnas_saldo = []
-    for columna in df.columns:
-        if any(palabra in columna.upper() for palabra in ['SALDO', 'BALANCE', 'ACTIVO', 'PASIVO', 'PATRIMONIO']):
-            columnas_saldo.append(columna)
-    
-    # Calcular totales y ratios financieros
-    if columnas_saldo:
-        for columna in columnas_saldo:
-            if columna in df.columns:
-                # Total del balance
-                total_balance = df[columna].sum()
-                df[f'TOTAL_{columna}'] = total_balance
-                
-                # Porcentaje del total
-                df[f'PORCENTAJE_{columna}'] = df[columna] / total_balance * 100
-                
-                # Promedio del balance
-                promedio_balance = df[columna].mean()
-                df[f'PROMEDIO_{columna}'] = promedio_balance
-    
-    # Calcular ratios financieros si hay columnas de activo y pasivo
-    if 'ACTIVO' in df.columns and 'PASIVO' in df.columns:
-        df['RATIO_ACTIVO_PASIVO'] = df['ACTIVO'] / df['PASIVO'].replace(0, np.nan)
-        df['RATIO_ACTIVO_PASIVO'] = df['RATIO_ACTIVO_PASIVO'].fillna(0)
-    
-    if 'ACTIVO' in df.columns and 'PATRIMONIO' in df.columns:
-        df['RATIO_ACTIVO_PATRIMONIO'] = df['ACTIVO'] / df['PATRIMONIO'].replace(0, np.nan)
-        df['RATIO_ACTIVO_PATRIMONIO'] = df['RATIO_ACTIVO_PATRIMONIO'].fillna(0)
-    
-    # Clasificación de cuentas
-    if 'CUENTA' in df.columns:
-        df['TIPO_CUENTA'] = df['CUENTA'].apply(clasificar_cuenta)
-    
-    # Agregar columnas de estado
-    df['ESTADO_PROCESAMIENTO'] = 'PROCESADO'
-    df['FECHA_PROCESAMIENTO'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    df['TIPO_PROCESAMIENTO'] = 'BALANCE_COMPLETO'
-    
-    # Agregar análisis temporal si hay fechas
-    columnas_fecha = [col for col in df.columns if 'FECHA' in col.upper()]
-    if columnas_fecha:
-        for columna_fecha in columnas_fecha:
-            if columna_fecha in df.columns:
-                # Extraer año y mes
-                df[f'ANIO_{columna_fecha}'] = pd.to_datetime(df[columna_fecha]).dt.year
-                df[f'MES_{columna_fecha}'] = pd.to_datetime(df[columna_fecha]).dt.month
-                df[f'TRIMESTRE_{columna_fecha}'] = pd.to_datetime(df[columna_fecha]).dt.quarter
-    
-    return df
+def normalizar_balance(df: pd.DataFrame) -> pd.DataFrame:
+    # Intentar detectar columnas típicas
+    posibles_div = [c for c in df.columns if "DIV" in c or "DIVISION" in c]
+    posibles_cuenta = [c for c in df.columns if "CUENTA" in c or "COD" in c]
+    posibles_saldo = [c for c in df.columns if ("SALDO" in c and "MES" not in c) or "VALOR" in c or "DEBITO" in c or "CRÉDITO" in c or "CREDITO" in c]
 
-def clasificar_cuenta(cuenta):
-    """
-    Clasifica las cuentas según su naturaleza
-    """
-    if pd.isna(cuenta):
-        return "NO_CLASIFICADA"
-    
-    cuenta_str = str(cuenta).upper()
-    
-    # Clasificación de activos
-    if any(palabra in cuenta_str for palabra in ['EFECTIVO', 'CASH', 'BANCO', 'BANK']):
-        return "ACTIVO_CORRIENTE"
-    elif any(palabra in cuenta_str for palabra in ['CUENTA', 'ACCOUNT', 'CLIENTE', 'CUSTOMER']):
-        return "ACTIVO_CORRIENTE"
-    elif any(palabra in cuenta_str for palabra in ['INVENTARIO', 'INVENTORY', 'MERCADERIA']):
-        return "ACTIVO_CORRIENTE"
-    elif any(palabra in cuenta_str for palabra in ['MAQUINARIA', 'EQUIPO', 'MACHINERY', 'EQUIPMENT']):
-        return "ACTIVO_FIJO"
-    elif any(palabra in cuenta_str for palabra in ['EDIFICIO', 'CONSTRUCCION', 'BUILDING']):
-        return "ACTIVO_FIJO"
-    
-    # Clasificación de pasivos
-    elif any(palabra in cuenta_str for palabra in ['PROVEEDOR', 'SUPPLIER', 'CUENTA_PAGAR']):
-        return "PASIVO_CORRIENTE"
-    elif any(palabra in cuenta_str for palabra in ['PRESTAMO', 'LOAN', 'DEUDA', 'DEBT']):
-        return "PASIVO_LARGO_PLAZO"
-    
-    # Clasificación de patrimonio
-    elif any(palabra in cuenta_str for palabra in ['CAPITAL', 'CAPITAL', 'UTILIDAD', 'PROFIT']):
-        return "PATRIMONIO"
-    
-    else:
-        return "NO_CLASIFICADA"
+    col_div = posibles_div[0] if posibles_div else df.columns[0]
+    col_cuenta = posibles_cuenta[0] if posibles_cuenta else df.columns[1]
+    col_saldo = posibles_saldo[0] if posibles_saldo else df.columns[-1]
 
-def crear_analisis_balance(df):
-    """
-    Crea análisis detallado del balance
-    """
-    analisis = {}
-    
-    # Estadísticas básicas
-    columnas_balance = [col for col in df.columns if any(palabra in col.upper() for palabra in ['SALDO', 'BALANCE', 'ACTIVO', 'PASIVO', 'PATRIMONIO'])]
-    
-    if columnas_balance:
-        for columna in columnas_balance:
-            if columna in df.columns:
-                analisis[f'estadisticas_{columna}'] = {
-                    'total': df[columna].sum(),
-                    'promedio': df[columna].mean(),
-                    'mediana': df[columna].median(),
-                    'maximo': df[columna].max(),
-                    'minimo': df[columna].min(),
-                    'desviacion_estandar': df[columna].std()
-                }
-    
-    # Análisis por tipo de cuenta
-    if 'TIPO_CUENTA' in df.columns:
-        analisis['por_tipo_cuenta'] = df.groupby('TIPO_CUENTA').agg({
-            col: ['sum', 'mean', 'count'] for col in columnas_balance if col in df.columns
-        }).round(2)
-    
-    # Análisis temporal
-    columnas_fecha = [col for col in df.columns if 'FECHA' in col.upper()]
-    if columnas_fecha:
-        for columna_fecha in columnas_fecha:
-            if columna_fecha in df.columns:
-                df_temp = df.copy()
-                df_temp[columna_fecha] = pd.to_datetime(df_temp[columna_fecha])
-                analisis[f'por_fecha_{columna_fecha}'] = df_temp.groupby(df_temp[columna_fecha].dt.to_period('M')).agg({
-                    col: 'sum' for col in columnas_balance if col in df.columns
-                }).round(2)
-    
-    return analisis
+    out = df[[col_div, col_cuenta, col_saldo]].copy()
+    out.columns = ["DIVISION", "CUENTA", "SALDO"]
+    out["SALDO"] = out["SALDO"].apply(convertir_valor)
+    out = out.groupby(["DIVISION", "CUENTA"], as_index=False)["SALDO"].sum()
+    return out
 
-def menu():
-    print("\n=== Procesador de Balance Completo ===")
-    print("1. Procesar archivo de balance completo")
-    print("0. Salir")
-    while True:
-        opcion = input("Seleccione una opción: ")
-        if opcion == "1":
-            ruta = input("Ingrese la ruta del archivo de balance: ")
-            try:
-                ruta_salida, resumen = procesar_balance_completo(ruta)
-                print(f"Procesamiento completado exitosamente\nArchivo de salida: {ruta_salida}\nResumen: {resumen}")
-            except Exception as e:
-                print(f"Error: {e}")
-        elif opcion == "0":
-            print("Saliendo...")
-            break
-        else:
-            print("Opción no válida.")
+def guardar_balance(df: pd.DataFrame, origen: str) -> str:
+    asegurar_directorio(OUTPUT_DIR)
+    ruta = os.path.join(OUTPUT_DIR, f"balance_normalizado_{timestamp()}.xlsx")
+    with pd.ExcelWriter(ruta, engine="xlsxwriter") as w:
+        df.to_excel(w, sheet_name="balance", index=False)
+        meta = pd.DataFrame({"ArchivoOrigen":[os.path.basename(origen)], "Filas":[len(df)]})
+        meta.to_excel(w, sheet_name="meta", index=False)
+    return ruta
+
+def main():
+    import argparse
+    p = argparse.ArgumentParser(description="Procesador Balance Completo")
+    p.add_argument("archivo", help="Ruta al Balance (xlsx)")
+    args = p.parse_args()
+
+    df_raw = leer_balance(args.archivo)
+    df_out = normalizar_balance(df_raw)
+    ruta = guardar_balance(df_out, args.archivo)
+    print(f"✅ Balance normalizado guardado en: {ruta}")
 
 if __name__ == "__main__":
-    menu()
+    main()

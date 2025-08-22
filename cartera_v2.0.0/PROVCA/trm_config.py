@@ -2,24 +2,26 @@ import os
 import json
 from datetime import datetime
 
-
+# Se establece la ruta del archivo de configuración para que esté en la misma carpeta del script
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'trm_config.json')
 
-
-def _ensure_dir_exists(path):
-    """Asegura que el directorio para el archivo de configuración exista."""
-    directory = os.path.dirname(path)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
-
+def _ensure_config_file_exists():
+    """Asegura que el archivo de configuración exista con valores iniciales."""
+    if not os.path.exists(CONFIG_PATH):
+        payload = {
+            'usd': 0.0,
+            'eur': 0.0,
+            'updated_at': None
+        }
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
 
 def load_trm():
     """Devuelve un dict {'usd': float|None, 'eur': float|None, 'updated_at': str|None}.
     Si el archivo no existe o hay un error, retorna un diccionario con valores nulos.
     """
+    _ensure_config_file_exists()
     try:
-        if not os.path.exists(CONFIG_PATH):
-            return {'usd': None, 'eur': None, 'updated_at': None}
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
         usd = data.get('usd')
@@ -30,12 +32,13 @@ def load_trm():
             'updated_at': data.get('updated_at')
         }
     except Exception:
+        # En caso de error de lectura, se vuelve a crear el archivo
+        _ensure_config_file_exists()
         return {'usd': None, 'eur': None, 'updated_at': None}
 
 
 def save_trm(usd, eur):
     """Guarda los valores de TRM en un archivo JSON."""
-    _ensure_dir_exists(CONFIG_PATH)
     payload = {
         'usd': float(usd) if usd is not None else None,
         'eur': float(eur) if eur is not None else None,

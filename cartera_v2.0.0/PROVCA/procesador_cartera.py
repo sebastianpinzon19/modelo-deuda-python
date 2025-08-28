@@ -304,26 +304,70 @@ def menu():
     except Exception as e:
         print("ERROR:", e)
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        try:
+def main():
+    """Punto de entrada principal para ejecución desde línea de comandos o PHP"""
+    try:
+        # Si se llama desde PHP con argumentos --key=value
+        if len(sys.argv) > 1 and '--archivo' in ' '.join(sys.argv):
+            import argparse
+            
+            parser = argparse.ArgumentParser(description='Procesador de Cartera')
+            parser.add_argument('--archivo', required=True, help='Ruta al archivo de entrada')
+            parser.add_argument('--fecha_corte', required=True, help='Fecha de corte en formato YYYY-MM-DD')
+            parser.add_argument('--output_dir', default='.', help='Directorio de salida')
+            
+            args = parser.parse_args()
+            
+            # Generar nombre de archivo de salida
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_file = os.path.join(args.output_dir, f'cartera_procesada_{timestamp}.xlsx')
+            
+            # Procesar el archivo
             procesar_cartera(
-                sys.argv[1],
-                sys.argv[2] if len(sys.argv) > 2 else None,
-                sys.argv[3] if len(sys.argv) > 3 else None,
-                ((len(sys.argv) > 4) and (str(sys.argv[4]).strip().lower() == "s")) or True,
-                sys.argv[5] if len(sys.argv) > 5 else None,
+                input_path=args.archivo,
+                output_path=output_file,
+                fecha_cierre_str=args.fecha_corte
             )
-            # Si se pasaron TRM por CLI, guardarlas para uso global
-            if len(sys.argv) > 6:
-                try:
-                    usd_cli = float(str(sys.argv[5]).replace(',', '.'))
-                    eur_cli = float(str(sys.argv[6]).replace(',', '.'))
-                    save_trm(usd_cli, eur_cli)
-                    print(f"ℹ TRM guardadas desde CLI. USD: {usd_cli} | EUR: {eur_cli}")
-                except Exception as e:
-                    print(f"⚠ TRM por CLI inválidas: {e}")
+            
+            print(json.dumps({
+                'success': True,
+                'message': 'Archivo procesado correctamente',
+                'output_file': output_file
+            }))
+            
+        # Modo interactivo
+        elif len(sys.argv) > 1:
+            procesar_cartera(
+                input_path=sys.argv[1],
+                output_path=sys.argv[2] if len(sys.argv) > 2 else None,
+                fecha_cierre_str=sys.argv[3] if len(sys.argv) > 3 else None,
+                override_moneda=sys.argv[4] if len(sys.argv) > 4 else None
+            )
+        else:
+            menu()
+            
+    except Exception as e:
+        import traceback
+        error_info = {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
+        print(json.dumps(error_info))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    import json
+    
+    # Manejar TRM si se pasan como argumentos
+    if len(sys.argv) > 6:
+        try:
+            usd_cli = float(str(sys.argv[5]).replace(',', '.'))
+            eur_cli = float(str(sys.argv[6]).replace(',', '.'))
+            save_trm(usd_cli, eur_cli)
+            print(f"ℹ TRM guardadas desde CLI. USD: {usd_cli} | EUR: {eur_cli}")
         except Exception as e:
-            print("ERROR:", e)
-    else:
-        menu()
+            print(f"⚠ TRM por CLI inválidas: {e}")
+    
+    # Ejecutar el programa principal
+    main()

@@ -95,10 +95,10 @@ def procesar_anticipos(input_path, output_path=None):
     # Definir ruta de salida
     if not output_path:
         ahora = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        output_path = os.path.join(output_dir, f'ANTICIPO_PROCESADO_{ahora}.xlsx')
+        output_path = os.path.join(output_dir, f'ANTICIPO_{ahora}.xlsx')
     elif os.path.isdir(output_path):
         ahora = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        output_path = os.path.join(output_path, f'ANTICIPO_PROCESADO_{ahora}.xlsx')
+        output_path = os.path.join(output_path, f'ANTICIPO_{ahora}.xlsx')
     elif not output_path.lower().endswith(('.xlsx', '.xls')):
         output_path += '.xlsx'
 

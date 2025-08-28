@@ -1,0 +1,54 @@
+[2025-08-27 14:57:37] [REQUEST] Request: {
+    "method": "GET",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": []
+}
+[2025-08-27 14:59:18] [REQUEST] Request: {
+    "method": "GET",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": []
+}
+[2025-08-27 15:04:02] [REQUEST] Request: {
+    "method": "GET",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": []
+}
+[2025-08-27 15:05:59] [REQUEST] Request: {
+    "method": "GET",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": []
+}
+[2025-08-27 15:09:10] [REQUEST] Request: {
+    "method": "GET",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": []
+}
+[2025-08-27 15:19:42] [REQUEST] Request: {
+    "method": "POST",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": {
+        "fecha_cierre": "2025-08-27"
+    }
+}
+[2025-08-27 15:19:42] [INFO] File uploaded successfully: C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\front_php\config/../../uploads/68af220e761a0.xlsx
+[2025-08-27 15:19:42] [INFO] File uploaded successfully: C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\front_php\config/../../uploads/68af220e76d8e.xlsx
+[2025-08-27 15:19:42] [ERROR] Error in form processing: Script not found: C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\front_php/../PROVCA/procesar_cartera.py
+[2025-08-27 15:19:42] [REQUEST] Request: {
+    "method": "GET",
+    "uri": "\/modelo-deuda-python\/cartera_v2.0.0\/front_php\/index.php",
+    "ip": "10.253.48.43",
+    "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36 Edg\/139.0.0.0",
+    "data": []
+}

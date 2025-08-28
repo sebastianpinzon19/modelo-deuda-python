@@ -1,732 +1,906 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Procesador Unificado de Cartera (solo pandas) - con menú
-
-Entradas (en una misma carpeta):
-- Balance (ej: contiene "balance")
-- Situación (ej: contiene "situacion")
-- Focus (ej: contiene "focus")
-- Dotación/Provisión del mes (ej: contiene "prov" o "dotacion")
-- Acumulado (ej: contiene "acumulado")
-
-Salidas:
-- Un Excel consolidado con 7 hojas:
-  Balance_Normalizado, Balance_Sumas_Cuentas, Situacion_Total_01010,
-  Focus_Vencimientos, Dotacion_Mes, Acumulado, Resumen_Final
-
-Notas:
-- Este script prioriza robustez: detección automática de columnas comunes
-  y normalización de formatos numéricos (latam).
-- Donde el documento Word es ambiguo, se dejan supuestos documentados
-  y constantes ajustables en CONFIG.
+Procesador Unificado de Cartera - Grupo Planeta
+Versión Optimizada con GUI integrado
+Procesa Balance, Situación, Focus, Dotación y Acumulado
 """
 
 import os
-import re
 import sys
+import re
 import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
 from datetime import datetime
-from trm_config import load_trm, save_trm, parse_trm_value, format_trm_display
+from typing import Dict, Optional, Tuple, Any
 
-# =========================
-# CONFIGURACIÓN AJUSTABLE
-# =========================
+# ========================================
+# CONFIGURACIÓN
+# ========================================
+
+OUTPUT_DIR = r"C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\PROVCA_PROCESADOS"
 
 CONFIG = {
-    # Palabras clave para encontrar archivos dentro de la carpeta
-    "files_glob": {
+    "files_patterns": {
         "balance": ["balance"],
         "situacion": ["situacion"],
         "focus": ["focus"],
-        "dotacion": ["provca", "provision", "dotacion", "prov_"],
+        "dotacion": ["provca", "provision", "dotacion", "prov"],
         "acumulado": ["acumulado"]
     },
-    # Mapeo/heurísticas de columnas típicas:
-    "columns": {
-        "balance": {
-            "division_like": ["DIV", "DIVISION"],
-            "cuenta_like": ["CUENTA", "COD"],
-            "saldo_like": ["SALDO", "VALOR", "DEBITO", "CRÉDITO", "CREDITO"],
-            # Preferir esta columna si existe
-            "saldo_prefer_tokens_all": [
-                ["saldo", "aaf", "vari"],  # "Saldo AAF variación"
-                ["saldo", "aaf"]
-            ]
-        },
-        "situacion": {
-            "saldo_mes_like": ["SALDO", "MES"],  # columna que contenga ambas palabras
-            "total_row_match": ["TOTAL", "01010"] # fila que contenga ambas
-        },
-        "focus": {
-            # buckets que intentaremos detectar en cualquier orden
-            "aging_like": {
-                "no_vencido_cols_any": [
-                    "por_vencer", "no vencido", "no_vencida", "no_vencidas"
-                ],
-                "vencido_30_cols_any": ["vencido 30", "30 dias", "30 días", "1-30"],
-                "vencido_60_cols_any": ["60 dias", "60 días", "31-60"],
-                "vencido_90_cols_any": ["90 dias", "90 días", "61-90"],
-                "vencido_120_cols_any": ["120 dias", "120 días", "91-120"],
-                "vencido_mas_90_cols_any": ["+90", "mas de 90", "más de 90", ">=90"],
-                "vencido_mas_120_cols_any": ["+120", "mas de 120", "más de 120", ">=120"]
-            }
-        },
-        "dotacion": {
-            "interco_like": ["interco resto", "interco"],
-            "acumuladas_inicial_like": ["dotaciones acumuladas", "inicial"],
-            "provision_mes_like": ["provision del mes", "provision mes", "provisión del mes"]
-        },
-        "acumulado": {
-            "fila_objetivo": 54,       # fila 54 (1-based)
-            "tomar_columnas_n": 5      # columnas B..F ~ 5 columnas
+    "balance": {
+        "cuentas_objetivo": [
+            "43001", "43002.20", "43002.21", "43002.15", 
+            "43002.28", "43002.31", "43002.63", "43008", "43042"
+        ],
+        "saldo_columna_preferida": ["saldo", "aaf", "variacion"]
+    },
+    "situacion": {
+        "fila_objetivo": ["total", "01010"],
+        "columna_objetivo": ["saldo", "mes"]
+    },
+    "focus": {
+        "hoja_preferida": ["españa", "espana"],
+        "vencimientos": {
+            "no_vencido": ["por_vencer", "no vencido", "no_vencida"],
+            "vencido_30": ["vencido 30", "30 dias", "30 días", "1-30"],
+            "vencido_60": ["60 dias", "60 días", "31-60", "vencido 60"],
+            "vencido_90": ["90 dias", "90 días", "61-90", "vencido 90"],
+            "vencido_mas_90": ["+90", "mas de 90", "más de 90", ">=90"]
         }
     },
-    # Reglas del Word (supuestos):
-    "word_rules": {
-        # 4. Cobro de mes - Vencida = (Deuda bruta NO Grupo (Inicial) vencidas - total vencido >=60) / 1000
-        # Supuesto: "Deuda bruta ... vencidas" = suma de TODOS los buckets vencidos (>=1 día)
+    "acumulado": {
+        "fila_objetivo": 54,
+        "columnas_rango": (1, 6)  # B a F (índices 1-5)
+    },
+    "calculos": {
         "cobro_vencida_divisor": 1000.0,
-
-        # 5. Cobro del mes - Total Deuda = (COBROS SITUACION (SALDO MES)) / -1000
-        # Supuesto: usamos TOTAL_01010_SALDO_MES de Situación como "COBROS SITUACION (SALDO MES)"
-        "cobro_total_divisor": -1000.0,
-
-        # 6. Cobros del mes - No Vencida = Cobro Total - Cobro Vencida
-        "cobro_no_vencida_is_residual": True,
-
-        # 7. +/- Vencidos en el mes – vencido = VENCIDO MES 30 días (signo positivo)
-        # Supuesto: usamos el bucket "vencido 30" de Focus como ese valor.
-        "usar_vencido_30_como_ajuste_mes": True,
-
-        # 10. + Facturación del mes – vencida = 0
-        "facturacion_mes_vencida": 0.0,
-
-        # 11. + Facturación del mes – no vencida = (Q22 - H22)  (ambigüo)
-        # Supuesto: Para no romper, por defecto 0; ajusta si tienes referencia clara.
-        "facturacion_mes_no_vencida": 0.0
+        "cobro_total_divisor": -1000.0
     }
 }
 
-# =====================
-# Utilidades generales
-# =====================
+# ========================================
+# UTILIDADES
+# ========================================
 
-def ts():
-    return datetime.now().strftime("%Y-%m-%d_%H%M%S")
+def asegurar_directorio():
+    """Crea el directorio de salida si no existe"""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def asegurar_dir(path):
-    os.makedirs(path, exist_ok=True)
+def timestamp():
+    """Genera timestamp para nombres de archivo"""
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def convertir_valor(valor):
-    """Convierte strings con formato LATAM a float."""
+def convertir_valor(valor) -> float:
+    """Convierte strings con formato colombiano/latino a float"""
     try:
         if valor is None or (isinstance(valor, float) and pd.isna(valor)):
             return 0.0
         if isinstance(valor, (int, float)):
             return float(valor)
-        s = str(valor).strip().replace('\u200b','').replace(' ','')
+        
+        s = str(valor).strip().replace('\u200b', '').replace(' ', '')
         if s == '' or s.lower() == 'nan':
             return 0.0
-        # si tiene ambos separadores, asume latam
+            
+        # Remover símbolos
+        s = s.replace('$', '').replace('(', '-').replace(')', '')
+        
+        # Manejar formato latino (punto como separador de miles, coma como decimal)
         if '.' in s and ',' in s:
             s = s.replace('.', '').replace(',', '.')
         elif ',' in s and '.' not in s:
             s = s.replace(',', '.')
-        # quita cualquier cosa rara
+            
+        # Limpiar caracteres no numéricos excepto punto y signo negativo
         s = re.sub(r'[^0-9\.\-]', '', s)
+        
         if s in ('', '-', '.', '-.'):
             return 0.0
+            
         return float(s)
     except:
         return 0.0
 
-def any_in(text, candidates):
-    t = str(text).lower()
-    return any(c in t for c in candidates)
-
-def find_first_col(df_cols, require_all=None, require_any=None):
-    """
-    Busca primera columna que cumpla:
-      - require_all: lista de palabras que deben estar
-      - require_any: lista de palabras de las cuales al menos 1 debe estar
-    """
-    for c in df_cols:
-        col = str(c).strip().lower()
-        if require_all and not all(w in col for w in require_all):
-            continue
-        if require_any and not any(w in col for w in require_any):
-            continue
-        return c
+def buscar_archivo_patron(carpeta: str, patrones: list) -> Optional[str]:
+    """Busca archivo que contenga alguno de los patrones"""
+    if not os.path.exists(carpeta):
+        return None
+        
+    archivos = os.listdir(carpeta)
+    for archivo in archivos:
+        nombre_lower = archivo.lower()
+        if any(patron in nombre_lower for patron in patrones):
+            if nombre_lower.endswith(('.xlsx', '.xls', '.csv')):
+                return os.path.join(carpeta, archivo)
     return None
 
-def find_cols_any(df_cols, needles_any):
-    """Devuelve todas las columnas que contengan alguna de las palabras (needles_any)."""
-    found = []
-    for c in df_cols:
-        col = str(c).lower()
-        if any(n in col for n in needles_any):
-            found.append(c)
-    return found
-
-# =====================
-# Utilidades Excel crudas
-# =====================
-
-def _col_letter_to_index0(letter):
-    """Convierte letra(s) de columna Excel (e.g., 'A', 'Q', 'AA') a índice 0-based."""
-    s = str(letter).strip().upper()
-    value = 0
-    for ch in s:
-        if not ('A' <= ch <= 'Z'):
-            return None
-        value = value * 26 + (ord(ch) - ord('A') + 1)
-    return value - 1 if value > 0 else None
-
-def _col_index0_to_letter(index0):
-    """Convierte índice 0-based a letra(s) de columna Excel (e.g., 0->A, 1->B, 26->AA)."""
-    n = int(index0) + 1
-    letters = ""
-    while n > 0:
-        n, rem = divmod(n - 1, 26)
-        letters = chr(65 + rem) + letters
-    return letters
-
-def extraer_facturacion_no_vencida_focus_es(ruta_excel, fila=22, col_q="Q", col_h="H"):
-    """
-    Intenta leer de la hoja 'España' (o similar) el valor Q22 - H22.
-    Si falla, devuelve 0.0. Usa lectura sin encabezados para preservar coordenadas.
-    """
-    try:
-        xls = pd.ExcelFile(ruta_excel)
-        hoja_esp = None
-        for hoja in xls.sheet_names:
-            h = str(hoja).lower()
-            if "españa" in h or "espana" in h or "espa" in h:
-                hoja_esp = hoja
-                break
-        if hoja_esp is None:
-            hoja_esp = xls.sheet_names[0]
-
-        df = pd.read_excel(ruta_excel, sheet_name=hoja_esp, header=None, dtype=str)
-        r = fila - 1
-        c_q = _col_letter_to_index0(col_q)
-        c_h = _col_letter_to_index0(col_h)
-        if r < 0 or r >= len(df.index):
-            return 0.0
-        vq = convertir_valor(df.iat[r, c_q]) if c_q is not None and c_q < df.shape[1] else 0.0
-        vh = convertir_valor(df.iat[r, c_h]) if c_h is not None and c_h < df.shape[1] else 0.0
-        return float(vq - vh)
-    except Exception:
-        return 0.0
-
-# =====================
-# Procesadores
-# =====================
-
-def leer_excel_multi_hoja(ruta_excel, dtype=str):
-    xls = pd.ExcelFile(ruta_excel)
+def leer_excel_multihoja(ruta: str) -> pd.DataFrame:
+    """Lee todas las hojas de un Excel y las concatena"""
+    xls = pd.ExcelFile(ruta)
     frames = []
+    
     for hoja in xls.sheet_names:
         try:
-            df = pd.read_excel(ruta_excel, sheet_name=hoja, dtype=dtype)
+            df = pd.read_excel(ruta, sheet_name=hoja, dtype=str)
             if not df.empty:
-                # normalizar encabezados
                 df.columns = [str(c).strip().upper() for c in df.columns]
                 df["__HOJA__"] = hoja
                 frames.append(df)
         except Exception:
             continue
+            
     if not frames:
-        raise ValueError(f"No se pudieron leer hojas válidas de: {os.path.basename(ruta_excel)}")
+        raise ValueError(f"No se pudieron leer hojas válidas de: {os.path.basename(ruta)}")
+    
     return pd.concat(frames, ignore_index=True)
 
-def procesar_balance(ruta_excel):
-    conf = CONFIG["columns"]["balance"]
-    df = leer_excel_multi_hoja(ruta_excel, dtype=str)
-    cols = df.columns.tolist()
-
-    col_div = find_first_col(cols, require_any=[w.lower() for w in conf["division_like"]]) or cols[0]
-    col_cuenta = find_first_col(cols, require_any=[w.lower() for w in conf["cuenta_like"]]) or cols[1]
-    # Preferir "Saldo AAF variación" si está disponible
-    col_saldo = None
-    for tokens in conf.get("saldo_prefer_tokens_all", []):
-        cand = find_first_col(cols, require_all=tokens)
-        if cand:
-            col_saldo = cand
-            break
-    if not col_saldo:
-        col_saldo = find_first_col(cols, require_any=[w.lower() for w in conf["saldo_like"]]) or cols[-1]
-
-    out = df[[col_div, col_cuenta, col_saldo]].copy()
-    out.columns = ["DIVISION", "CUENTA", "SALDO"]
-    out["SALDO"] = out["SALDO"].apply(convertir_valor)
-    out = out.groupby(["DIVISION", "CUENTA"], as_index=False)["SALDO"].sum()
-    return out
-
-def sumar_cuentas_balance(df_balance):
-    """
-    Del Word:
-      Total cuenta objeto 43001
-      0080.43002.20 / .21 / .15 / .28 / .31 / .63
-      Total cuenta objeto 43008
-      Total cuenta objeto 43042
-
-    Heurística:
-    - Si CUENTA contiene exactamente "43001" -> sumar
-    - Si CUENTA contiene "43002.20", etc. -> sumar
-    - Si CUENTA contiene "43008", "43042" -> sumar
-    - También se prueba con prefijo "0080." tal como aparece.
-    """
-    patrones = {
-        # Usamos límites de palabra para evitar grupos de captura y warnings
-        "Total_43001": [r"\b43001\b"],
-        "Total_43008": [r"\b43008\b"],
-        "Total_43042": [r"\b43042\b"],
-        "Total_43002_detalle": [
-            r"43002\.20", r"43002\.21", r"43002\.15",
-            r"43002\.28", r"43002\.31", r"43002\.63",
-            r"0080\.43002\.20", r"0080\.43002\.21", r"0080\.43002\.15",
-            r"0080\.43002\.28", r"0080\.43002\.31", r"0080\.43002\.63"
-        ]
-    }
-
-    resumen = []
-    for etiqueta, pats in patrones.items():
-        mask = df_balance["CUENTA"].astype(str).str.contains("|".join(pats), regex=True, case=False, na=False)
-        total = df_balance.loc[mask, "SALDO"].sum()
-        resumen.append({"Concepto": etiqueta, "Valor": total})
-
-    return pd.DataFrame(resumen)
-
-def procesar_situacion(ruta_excel):
-    conf = CONFIG["columns"]["situacion"]
-    df = leer_excel_multi_hoja(ruta_excel, dtype=str)
-
-    # localizar columna "Saldos Mes"
-    col_saldo_mes = find_first_col(
-        df.columns,
-        require_all=[w.lower() for w in conf["saldo_mes_like"]]
-    )
-    if not col_saldo_mes:
-        raise ValueError("Situación: no se encontró columna tipo 'Saldos Mes'.")
-
-    # localizar fila TOTAL 01010
-    df_norm = df.astype(str).apply(lambda col: col.str.strip().str.upper())
-    mask = df_norm.apply(
-        lambda fila: all(k in " ".join(fila.values) for k in conf["total_row_match"]),
-        axis=1
-    )
-    if not mask.any():
-        raise ValueError("Situación: no se encontró fila 'TOTAL 01010'.")
-
-    valor = convertir_valor(df.loc[mask, col_saldo_mes].iloc[0])
-    return pd.DataFrame({"Concepto": ["TOTAL_01010_SALDO_MES"], "Valor": [valor]})
-
-def _sum_cols_any(df, keys_any):
-    """Suma todas las columnas cuyos nombres contengan alguna palabra de keys_any."""
-    if not keys_any:
-        return 0.0
-    cols = find_cols_any(df.columns, [k.lower() for k in keys_any])
-    if not cols:
-        return 0.0
-    vals = df[cols].applymap(convertir_valor).sum().sum()
-    return float(vals)
-
-def procesar_focus(ruta_excel):
-    """
-    Intenta detectar buckets de vencimientos y sumar:
-    - No_Vencido
-    - Vencido_30
-    - Vencido_60
-    - Vencido_90
-    - Vencido_120
-    - Vencido_+90
-    - Vencido_+120
-
-    Luego calcula totales:
-    - Total_Vencido = suma de todos los buckets vencidos
-    - Total_No_Vencido = No_Vencido
-    - Total_Deuda = Total_Vencido + Total_No_Vencido
-    """
-    conf = CONFIG["columns"]["focus"]["aging_like"]
-    # Preferir la hoja que contenga "España" (o variantes) del formato España
-    xls = pd.ExcelFile(ruta_excel)
-    hoja_esp = None
-    for hoja in xls.sheet_names:
-        h = str(hoja).lower()
-        if "españa" in h or "espana" in h or "espa" in h:
-            hoja_esp = hoja
-            break
-    if hoja_esp is not None:
-        df = pd.read_excel(ruta_excel, sheet_name=hoja_esp, dtype=str)
-        df.columns = [str(c).strip().upper() for c in df.columns]
-    else:
-        df = leer_excel_multi_hoja(ruta_excel, dtype=str)
-
-    # Asegura numérico para todo lo que sea posible
-    df_num = df.copy()
-    for c in df_num.columns:
-        df_num[c] = df_num[c].apply(convertir_valor)
-
-    # Sumas por buckets (heurístico por nombre de columna)
-    no_vencido = _sum_cols_any(df, conf["no_vencido_cols_any"])
-    v30 = _sum_cols_any(df, conf["vencido_30_cols_any"])
-    v60 = _sum_cols_any(df, conf["vencido_60_cols_any"])
-    v90 = _sum_cols_any(df, conf["vencido_90_cols_any"])
-    v120 = _sum_cols_any(df, conf["vencido_120_cols_any"])
-    vmas90 = _sum_cols_any(df, conf["vencido_mas_90_cols_any"])
-    vmas120 = _sum_cols_any(df, conf["vencido_mas_120_cols_any"])
-
-    # Evitar doble conteo: si hay +90 y 90 separados, tomamos el mayor como representativo
-    # (ajusta según tus archivos reales)
-    total_vencido_componentes = [v30, v60, v90, v120]
-    if vmas120 > 0:
-        total_vencido_componentes.append(vmas120)
-    elif vmas90 > 0:
-        total_vencido_componentes.append(vmas90)
-
-    total_vencido = sum(total_vencido_componentes)
-    total_no_vencido = no_vencido
-    total_deuda = total_vencido + total_no_vencido
-
-    df_out = pd.DataFrame({
-        "Concepto": [
-            "No_Vencido", "Vencido_30", "Vencido_60", "Vencido_90", "Vencido_120",
-            "Vencido_+90", "Vencido_+120", "Total_Vencido", "Total_No_Vencido", "Total_Deuda"
-        ],
-        "Valor": [
-            no_vencido, v30, v60, v90, v120, vmas90, vmas120,
-            total_vencido, total_no_vencido, total_deuda
-        ]
-    })
-    return df_out
-
-def procesar_dotacion(ruta_excel):
-    """
-    Dotación del mes (Word):
-      Dotación = Interco_RESTO - Dotaciones_Acumuladas (Inicial) - Provisión del mes
-    """
-    df = leer_excel_multi_hoja(ruta_excel, dtype=str)
-    cols = df.columns
-
-    interco_cols = find_cols_any(cols, [w.lower() for w in CONFIG["columns"]["dotacion"]["interco_like"]])
-    acum_cols = [c for c in cols if all(w in c.lower() for w in CONFIG["columns"]["dotacion"]["acumuladas_inicial_like"])]
-    prov_cols = find_cols_any(cols, [w.lower() for w in CONFIG["columns"]["dotacion"]["provision_mes_like"]])
-
-    v_interco = df[interco_cols].applymap(convertir_valor).sum().sum() if interco_cols else 0.0
-    v_acum = df[acum_cols].applymap(convertir_valor).sum().sum() if acum_cols else 0.0
-    v_prov = df[prov_cols].applymap(convertir_valor).sum().sum() if prov_cols else 0.0
-    dotacion_mes = v_interco - v_acum - v_prov
-
-    return pd.DataFrame({
-        "Concepto": ["Interco_RESTO", "Dotaciones_Acumuladas_Inicial", "Provision_Mes", "Dotacion_Mes"],
-        "Valor": [v_interco, v_acum, v_prov, dotacion_mes]
-    })
-
-def procesar_acumulado(ruta_excel):
-    """
-    Lee la primera hoja del archivo de acumulado SIN encabezados y extrae la fila 54,
-    columnas B..F (5 columnas). Devuelve conceptos con letras de columna
-    para evitar "UNNAMED".
-    """
-    conf = CONFIG["columns"]["acumulado"]
-    try:
-        df = pd.read_excel(ruta_excel, sheet_name=0, header=None, dtype=str)
-    except Exception:
-        df = pd.read_excel(ruta_excel, header=None, dtype=str)
-
-    fila_idx = conf["fila_objetivo"] - 1
-    if fila_idx >= len(df.index):
-        fila_idx = len(df.index) - 1 if len(df.index) > 0 else 0
-
-    inicio = 1  # Columna B (0=A, 1=B)
-    fin_exclusivo = inicio + max(1, int(conf["tomar_columnas_n"]))
-
-    pares = []
-    for j in range(inicio, min(fin_exclusivo, df.shape[1])):
-        letra = _col_index0_to_letter(j)
-        concepto = f"Fila{conf['fila_objetivo']}_Col_{letra}"
-        valor = convertir_valor(df.iat[fila_idx, j])
-        pares.append((concepto, valor))
-
-    return pd.DataFrame(pares, columns=["Concepto", "Valor"])
-
-# ================
-# Resumen Final
-# ================
-
-def construir_resumen(df_situacion, df_focus, df_dotacion, fact_no_vencida_override=None):
-    """
-    Aplica reglas del Word para construir:
-      - Cobro_mes_Vencida
-      - Cobro_mes_Total
-      - Cobro_mes_No_Vencida
-      - +/- Vencidos (vencido / no vencido / total)
-      - + Facturación (vencida / no vencida)
-    """
-    rules = CONFIG["word_rules"]
-
-    # Situación: usamos TOTAL_01010_SALDO_MES como "COBROS SITUACION (SALDO MES)"
-    cobros_situacion = float(
-        df_situacion.set_index("Concepto").loc["TOTAL_01010_SALDO_MES", "Valor"]
-    ) if "TOTAL_01010_SALDO_MES" in df_situacion["Concepto"].values else 0.0
-
-    # Focus: sacamos los totales
-    map_focus = df_focus.set_index("Concepto")["Valor"].to_dict()
-    total_vencido = float(map_focus.get("Total_Vencido", 0.0))
-    total_no_vencido = float(map_focus.get("Total_No_Vencido", 0.0))
-    total_deuda = float(map_focus.get("Total_Deuda", total_vencido + total_no_vencido))
-    vencido_30 = float(map_focus.get("Vencido_30", 0.0))
-
-    # 4. Cobro mes - Vencida
-    deuda_bruta_no_grupo_inicial_vencidas = total_vencido  # sup: todas las vencidas
-    total_vencido_60omas = float(map_focus.get("Vencido_60", 0.0)) \
-                           + float(map_focus.get("Vencido_90", 0.0)) \
-                           + float(map_focus.get("Vencido_120", 0.0)) \
-                           + max(float(map_focus.get("Vencido_+120", 0.0)), float(map_focus.get("Vencido_+90", 0.0)))
-    cobro_mes_vencida = (deuda_bruta_no_grupo_inicial_vencidas - total_vencido_60omas) / rules["cobro_vencida_divisor"]
-
-    # 5. Cobro mes - Total Deuda
-    cobro_mes_total = cobros_situacion / rules["cobro_total_divisor"]
-
-    # 6. Cobros del mes - No Vencida = Total - Vencida
-    cobro_mes_no_vencida = cobro_mes_total - cobro_mes_vencida if rules["cobro_no_vencida_is_residual"] else 0.0
-
-    # 7. +/- Vencidos en el mes – vencido = VENCIDO MES 30 días
-    ajuste_vencidos_mes_vencido = vencido_30 if rules["usar_vencido_30_como_ajuste_mes"] else 0.0
-
-    # 8. +/- No vencido = opuesto del vencido 30 días (según especificación D17)
-    ajuste_vencidos_mes_no_vencido = -ajuste_vencidos_mes_vencido
-
-    # 9. +/- Vencidos en el mes – Total deuda = vencido - no vencido
-    ajuste_vencidos_mes_total = ajuste_vencidos_mes_vencido - ajuste_vencidos_mes_no_vencido
-
-    # 10 y 11. Facturación del mes
-    # Vencida = 0 (según especificación)
-    fact_vencida = rules["facturacion_mes_vencida"]
-    # No vencida: si recibimos override desde el archivo Focus (Q22-H22), úsalo
-    fact_no_vencida = (
-        float(fact_no_vencida_override)
-        if fact_no_vencida_override is not None
-        else rules["facturacion_mes_no_vencida"]
-    )
-
-    # Dotación ya viene calculada en df_dotacion
-    dotacion_mes = float(df_dotacion.set_index("Concepto").get("Valor").get("Dotacion_Mes", 0.0)) \
-        if "Dotacion_Mes" in df_dotacion["Concepto"].values else 0.0
-
-    df_resumen = pd.DataFrame({
-        "Concepto": [
-            "Cobro_Mes_Total", "Cobro_Mes_Vencida", "Cobro_Mes_No_Vencida",
-            "+/- Vencidos_Mes_Vencido", "+/- Vencidos_Mes_No_Vencido", "+/- Vencidos_Mes_Total",
-            "Facturacion_Mes_Vencida", "Facturacion_Mes_No_Vencida",
-            "Total_Vencido", "Total_No_Vencido", "Total_Deuda",
-            "Dotacion_Mes"
-        ],
-        "Valor": [
-            cobro_mes_total, cobro_mes_vencida, cobro_mes_no_vencida,
-            ajuste_vencidos_mes_vencido, ajuste_vencidos_mes_no_vencido, ajuste_vencidos_mes_total,
-            fact_vencida, fact_no_vencida,
-            total_vencido, total_no_vencido, total_deuda,
-            dotacion_mes
-        ]
-    })
-    return df_resumen
-
-
-def construir_resumen_matriz(df_situacion, df_focus, df_dotacion, fact_no_vencida_override=None):
-    """
-    Devuelve una tabla en formato matriz con columnas Vencida/No_Vencida/Total
-    que agrupa los rubros principales del mes, alineada al formato del documento.
-    """
-    df_r = construir_resumen(df_situacion, df_focus, df_dotacion, fact_no_vencida_override)
-    m = df_r.set_index("Concepto")["Valor"].to_dict()
-
-    rows = []
-    def add_row(nombre, v_vencida, v_no_vencida):
-        rows.append({
-            "Concepto": nombre,
-            "Vencida": float(v_vencida),
-            "No_Vencida": float(v_no_vencida),
-            "Total": float(v_vencida) + float(v_no_vencida)
-        })
-
-    # Líneas principales
-    add_row("Cobros", m.get("Cobro_Mes_Vencida", 0.0), m.get("Cobro_Mes_No_Vencida", 0.0))
-    add_row("+ Facturación", m.get("Facturacion_Mes_Vencida", 0.0), m.get("Facturacion_Mes_No_Vencida", 0.0))
-    add_row("+/- Vencidos", m.get("+/- Vencidos_Mes_Vencido", 0.0), m.get("+/- Vencidos_Mes_No_Vencido", 0.0))
-
-    # Totales de cartera (informativos)
-    rows.append({
-        "Concepto": "Total Cartera",
-        "Vencida": float(m.get("Total_Vencido", 0.0)),
-        "No_Vencida": float(m.get("Total_No_Vencido", 0.0)),
-        "Total": float(m.get("Total_Deuda", 0.0))
-    })
-
-    # Dotación (se muestra en la columna Total)
-    rows.append({
-        "Concepto": "Dotacion del Mes",
-        "Vencida": 0.0,
-        "No_Vencida": 0.0,
-        "Total": float(m.get("Dotacion_Mes", 0.0))
-    })
-
-    return pd.DataFrame(rows, columns=["Concepto", "Vencida", "No_Vencida", "Total"])
-
-# =====================
-# Búsqueda de archivos
-# =====================
-
-def pick_file(carpeta, patterns):
-    files = os.listdir(carpeta)
-    for f in files:
-        name = f.lower()
-        if any(p in name for p in patterns):
-            if f.lower().endswith((".xlsx", ".xls", ".csv")):
-                return os.path.join(carpeta, f)
+def encontrar_columna(columnas: list, palabras_clave: list) -> Optional[str]:
+    """Encuentra columna que contenga todas las palabras clave"""
+    for col in columnas:
+        col_lower = str(col).lower()
+        if all(palabra.lower() in col_lower for palabra in palabras_clave):
+            return col
     return None
 
-def descubrir_archivos(carpeta):
-    globs = CONFIG["files_glob"]
-    balance = pick_file(carpeta, globs["balance"])
-    situacion = pick_file(carpeta, globs["situacion"])
-    focus = pick_file(carpeta, globs["focus"])
-    dotacion = pick_file(carpeta, globs["dotacion"])
-    acumulado = pick_file(carpeta, globs["acumulado"])
-    return balance, situacion, focus, dotacion, acumulado
+def encontrar_columnas_any(columnas: list, palabras_clave: list) -> list:
+    """Encuentra columnas que contengan alguna de las palabras clave"""
+    encontradas = []
+    for col in columnas:
+        col_lower = str(col).lower()
+        if any(palabra.lower() in col_lower for palabra in palabras_clave):
+            encontradas.append(col)
+    return encontradas
 
-# =====================
-# Guardado Excel final
-# =====================
+# ========================================
+# PROCESADORES ESPECÍFICOS
+# ========================================
 
-def guardar_excel_salida(carpeta, **dfs):
-    # Usar la carpeta PROVCA_PROCESADOS en lugar de crear una subcarpeta
-    out_dir = r"C:\wamp64\www\modelo-deuda-python\cartera_v2.0.0\PROVCA_PROCESADOS"
-    asegurar_dir(out_dir)
-    out_file = os.path.join(out_dir, f"procesamiento_unificado_{ts()}.xlsx")
-    # Auto-ajuste de columnas y formato numérico usando openpyxl
-    from openpyxl.utils import get_column_letter
-    with pd.ExcelWriter(out_file, engine="openpyxl") as writer:
-        for nombre_hoja, df in dfs.items():
-            sheet_name = nombre_hoja[:31]
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-            ws = writer.sheets[sheet_name]
+class ProcesadorBalance:
+    def __init__(self, config: dict):
+        self.config = config
+    
+    def procesar(self, ruta: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Procesa archivo de balance y retorna balance normalizado y sumas"""
+        df = leer_excel_multihoja(ruta)
+        
+        # Encontrar columnas
+        col_division = encontrar_columna(df.columns, ["div"]) or df.columns[0]
+        col_cuenta = encontrar_columna(df.columns, ["cuenta"]) or df.columns[1]
+        
+        # Preferir columna con "saldo aaf variación"
+        col_saldo = encontrar_columna(df.columns, self.config["saldo_columna_preferida"])
+        if not col_saldo:
+            col_saldo = encontrar_columna(df.columns, ["saldo"]) or df.columns[-1]
+        
+        # Normalizar balance
+        balance = df[[col_division, col_cuenta, col_saldo]].copy()
+        balance.columns = ["DIVISION", "CUENTA", "SALDO"]
+        balance["SALDO"] = balance["SALDO"].apply(convertir_valor)
+        balance = balance.groupby(["DIVISION", "CUENTA"], as_index=False)["SALDO"].sum()
+        
+        # Calcular sumas por cuentas específicas
+        sumas = self._calcular_sumas_cuentas(balance)
+        
+        return balance, sumas
+    
+    def _calcular_sumas_cuentas(self, df_balance: pd.DataFrame) -> pd.DataFrame:
+        """Calcula sumas de cuentas específicas según documento"""
+        resultados = []
+        
+        # Mapeo de cuentas según documento
+        grupos_cuentas = {
+            "Total_43001": ["43001"],
+            "Total_43002_detalle": ["43002.20", "43002.21", "43002.15", "43002.28", "43002.31", "43002.63"],
+            "Total_43008": ["43008"],
+            "Total_43042": ["43042"]
+        }
+        
+        for grupo, cuentas in grupos_cuentas.items():
+            total = 0.0
+            for cuenta in cuentas:
+                # Buscar cuenta exacta o con prefijo 0080
+                mask1 = df_balance["CUENTA"].astype(str).str.contains(rf"\b{re.escape(cuenta)}\b", na=False, case=False)
+                mask2 = df_balance["CUENTA"].astype(str).str.contains(rf"0080\.{re.escape(cuenta)}", na=False, case=False)
+                mask = mask1 | mask2
+                total += df_balance.loc[mask, "SALDO"].sum()
+            
+            resultados.append({"Concepto": grupo, "Valor": total})
+        
+        return pd.DataFrame(resultados)
 
-            # Congelar encabezados
-            ws.freeze_panes = "A2"
+class ProcesadorSituacion:
+    def __init__(self, config: dict):
+        self.config = config
+    
+    def procesar(self, ruta: str) -> pd.DataFrame:
+        """Procesa archivo de situación"""
+        df = leer_excel_multihoja(ruta)
+        
+        # Encontrar columna SALDOS MES
+        col_saldos = encontrar_columna(df.columns, self.config["columna_objetivo"])
+        if not col_saldos:
+            raise ValueError(f"No se encontró columna con las palabras clave {self.config['columna_objetivo']} en Situación")
+        
+        # Encontrar fila TOTAL 01010
+        df_texto = df.astype(str).apply(lambda col: col.str.strip().str.upper())
+        mask = df_texto.apply(
+            lambda fila: all(palabra in " ".join(fila.values) for palabra in ["TOTAL", "01010"]),
+            axis=1
+        )
+        
+        if not mask.any():
+            raise ValueError("No se encontró fila 'TOTAL 01010' en Situación")
+        
+        valor = convertir_valor(df.loc[mask, col_saldos].iloc[0])
+        
+        return pd.DataFrame({
+            "Concepto": ["TOTAL_01010_SALDOS_MES"],
+            "Valor": [valor]
+        })
 
-            # Auto ancho de columnas y formato numérico para evitar notación científica
-            for idx_col, col in enumerate(df.columns, start=1):
-                # Calcular ancho
-                series = df[col]
-                max_len = max(
-                    len(str(col)),
-                    max((len(str(x)) for x in series.fillna("")), default=0)
-                )
-                ws.column_dimensions[get_column_letter(idx_col)].width = max(10, min(max_len + 2, 60))
-
-                # Formato numérico para toda la columna (filas de datos)
-                for row in range(2, 2 + len(df)):
-                    cell = ws.cell(row=row, column=idx_col)
-                    if isinstance(cell.value, (int, float)):
-                        # Mostrar con miles y 2 decimales para evitar 1E-09 y similares
-                        cell.number_format = '#,##0.00'
-    return out_file
-
-# ================
-# Menú principal
-# ================
-
-def ejecutar_proceso(carpeta):
-    balance_file, situacion_file, focus_file, dotacion_file, acumulado_file = descubrir_archivos(carpeta)
-    faltantes = [n for n, p in [
-        ("Balance", balance_file),
-        ("Situacion", situacion_file),
-        ("Focus", focus_file),
-        ("Dotacion/Provisión", dotacion_file),
-        ("Acumulado", acumulado_file),
-    ] if not p]
-
-    if faltantes:
-        raise FileNotFoundError("No se encontraron estos archivos en la carpeta: " + ", ".join(faltantes))
-
-    # Aviso de TRM vigente (persistida)
-    cfg = load_trm()
-    print(f"TRM actual guardada -> USD: {cfg.get('usd')} | EUR: {cfg.get('eur')} (fecha: {cfg.get('updated_at')})")
-
-    # --- Procesos ---
-    df_balance = procesar_balance(balance_file)
-    df_balance_sumas = sumar_cuentas_balance(df_balance)
-    df_situacion = procesar_situacion(situacion_file)
-    df_focus = procesar_focus(focus_file)
-    df_dotacion = procesar_dotacion(dotacion_file)
-    df_acumulado = procesar_acumulado(acumulado_file)
-
-    # Cálculo específico: Facturación del mes – No vencida = Q22 - H22 (hoja España)
-    fact_no_vencida_es = extraer_facturacion_no_vencida_focus_es(focus_file, fila=22, col_q="Q", col_h="H")
-    df_resumen = construir_resumen(df_situacion, df_focus, df_dotacion, fact_no_vencida_override=fact_no_vencida_es)
-
-    # Guardar
-    out_file = guardar_excel_salida(carpeta,
-        Balance_Normalizado=df_balance,
-        Balance_Sumas_Cuentas=df_balance_sumas,
-        Situacion_Total_01010=df_situacion,
-        Focus_Vencimientos=df_focus,
-        Dotacion_Mes=df_dotacion,
-        Acumulado=df_acumulado,
-        Resumen_Final=df_resumen,
-        Resumen_Matriz=construir_resumen_matriz(df_situacion, df_focus, df_dotacion, fact_no_vencida_override=fact_no_vencida_es)
-    )
-    return out_file
-
-
-def menu():
-    while True:
-        print("\n=== MENÚ PROCESADOR UNIFICADO ===")
-        print("1. Procesar carpeta de datos")
-        print("2. Ver/Configurar TRM (Dólar/Euro)")
-        print("3. Salir")
-        opcion = input("Seleccione una opción: ").strip()
-
-        if opcion == "1":
-            carpeta = input("Ruta de la carpeta con los 5 archivos: ").strip('"')
-            if not os.path.isdir(carpeta):
-                print("⚠ La ruta no es una carpeta válida.")
-                continue
-            try:
-                print("🔄 Procesando...")
-                out = ejecutar_proceso(carpeta)
-                print(f"✅ Listo. Archivo generado en:\n{out}")
-            except Exception as e:
-                print(f"❌ Error: {e}")
-        elif opcion == "2":
-            cfg = load_trm()
-            print(f"TRM guardadas → USD: {format_trm_display(cfg.get('usd'))} | EUR: {format_trm_display(cfg.get('eur'))} (actualizado: {cfg.get('updated_at')})")
-            print("Deje vacío para mantener el valor actual.")
-            usd_txt = input("Nueva TRM Dólar: ").strip()
-            eur_txt = input("Nueva TRM Euro: ").strip()
-            try:
-                new_usd = parse_trm_value(usd_txt, cfg.get('usd'))
-                new_eur = parse_trm_value(eur_txt, cfg.get('eur'))
-                save_trm(new_usd, new_eur)
-                print(f"✅ TRM guardadas. USD: {format_trm_display(new_usd)} | EUR: {format_trm_display(new_eur)}")
-            except Exception as e:
-                print(f"❌ No se pudieron guardar las TRM: {e}")
-        elif opcion == "3":
-            print("👋 Saliendo...")
-            sys.exit(0)
+class ProcesadorFocus:
+    def __init__(self, config: dict):
+        self.config = config
+    
+    def procesar(self, ruta: str) -> pd.DataFrame:
+        """Procesa archivo Focus de vencimientos"""
+        # Intentar leer hoja España específicamente
+        xls = pd.ExcelFile(ruta)
+        hoja_objetivo = None
+        
+        for hoja in xls.sheet_names:
+            if any(pref.lower() in hoja.lower() for pref in self.config["hoja_preferida"]):
+                hoja_objetivo = hoja
+                break
+        
+        if hoja_objetivo:
+            df = pd.read_excel(ruta, sheet_name=hoja_objetivo, dtype=str)
+            df.columns = [str(c).strip().upper() for c in df.columns]
         else:
-            print("⚠ Opción no válida, intente de nuevo.")
+            df = leer_excel_multihoja(ruta)
+        
+        # Convertir a numérico
+        for col in df.columns:
+            if col != "__HOJA__":
+                df[col] = df[col].apply(convertir_valor)
+        
+        # Extraer vencimientos por categorías
+        vencimientos = {}
+        for categoria, patrones in self.config["vencimientos"].items():
+            cols = encontrar_columnas_any(df.columns, patrones)
+            total = df[cols].sum().sum() if cols else 0.0
+            vencimientos[categoria] = float(total)
+        
+        # Calcular totales
+        total_vencido = sum(v for k, v in vencimientos.items() if k != "no_vencido")
+        total_no_vencido = vencimientos.get("no_vencido", 0.0)
+        total_deuda = total_vencido + total_no_vencido
+        
+        # Preparar resultados
+        resultados = []
+        for categoria, valor in vencimientos.items():
+            resultados.append({"Concepto": categoria.title(), "Valor": valor})
+        
+        resultados.extend([
+            {"Concepto": "Total_Vencido", "Valor": total_vencido},
+            {"Concepto": "Total_No_Vencido", "Valor": total_no_vencido},
+            {"Concepto": "Total_Deuda", "Valor": total_deuda}
+        ])
+        
+        return pd.DataFrame(resultados)
+    
+    def extraer_facturacion_q22_h22(self, ruta: str) -> float:
+        """Extrae Q22-H22 de hoja España para facturación no vencida"""
+        try:
+            xls = pd.ExcelFile(ruta)
+            hoja_esp = None
+            
+            for hoja in xls.sheet_names:
+                if any(pref.lower() in hoja.lower() for pref in self.config["hoja_preferida"]):
+                    hoja_esp = hoja
+                    break
+            
+            if not hoja_esp:
+                return 0.0
+            
+            # Leer sin encabezados para preservar coordenadas
+            df = pd.read_excel(ruta, sheet_name=hoja_esp, header=None, dtype=str)
+            
+            # Fila 22 (índice 21), columnas Q (16) y H (7)
+            fila = 21
+            col_q = 16  # Q
+            col_h = 7   # H
+            
+            if fila < len(df) and col_q < df.shape[1] and col_h < df.shape[1]:
+                val_q = convertir_valor(df.iat[fila, col_q])
+                val_h = convertir_valor(df.iat[fila, col_h])
+                return val_q - val_h
+            
+        except Exception:
+            pass
+        
+        return 0.0
+
+class ProcesadorDotacion:
+    def procesar(self, ruta: str) -> pd.DataFrame:
+        """Procesa archivo de dotación/provisión"""
+        df = leer_excel_multihoja(ruta)
+        
+        # Convertir a numérico
+        for col in df.columns:
+            if col != "__HOJA__":
+                df[col] = df[col].apply(convertir_valor)
+        
+        # Buscar componentes
+        interco_cols = encontrar_columnas_any(df.columns, ["interco", "resto"])
+        acumuladas_cols = encontrar_columnas_any(df.columns, ["dotaciones", "acumuladas", "inicial"])
+        provision_cols = encontrar_columnas_any(df.columns, ["provision", "mes"])
+        
+        interco_valor = df[interco_cols].sum().sum() if interco_cols else 0.0
+        acumuladas_valor = df[acumuladas_cols].sum().sum() if acumuladas_cols else 0.0
+        provision_valor = df[provision_cols].sum().sum() if provision_cols else 0.0
+        
+        # Cálculo según documento: Interco RESTO - Dotaciones Acumuladas (Inicial) - Provisión del mes
+        dotacion_mes = interco_valor - acumuladas_valor - provision_valor
+        
+        return pd.DataFrame({
+            "Concepto": ["Interco_RESTO", "Dotaciones_Acumuladas", "Provision_Mes", "Dotacion_Mes"],
+            "Valor": [interco_valor, acumuladas_valor, provision_valor, dotacion_mes]
+        })
+
+class ProcesadorAcumulado:
+    def __init__(self, config: dict):
+        self.config = config
+    
+    def procesar(self, ruta: str) -> pd.DataFrame:
+        """Procesa archivo de acumulado - extrae fila 54, columnas B-F"""
+        # Leer sin encabezados para preservar estructura
+        df = pd.read_excel(ruta, sheet_name=0, header=None, dtype=str)
+        
+        fila_objetivo = self.config["fila_objetivo"] - 1  # Convertir a índice 0
+        inicio_col, fin_col = self.config["columnas_rango"]
+        
+        if fila_objetivo >= len(df):
+            fila_objetivo = len(df) - 1
+        
+        resultados = []
+        for i in range(inicio_col, min(fin_col, df.shape[1])):
+            letra_col = chr(ord('A') + i)  # A=0, B=1, etc.
+            concepto = f"Fila{self.config['fila_objetivo']}_Col_{letra_col}"
+            valor = convertir_valor(df.iat[fila_objetivo, i])
+            resultados.append({"Concepto": concepto, "Valor": valor})
+        
+        return pd.DataFrame(resultados)
+
+# ========================================
+# CALCULADOR DE RESUMEN
+# ========================================
+
+class CalculadorResumen:
+    def __init__(self, config: dict):
+        self.config = config
+    
+    def calcular(self, df_situacion: pd.DataFrame, df_focus: pd.DataFrame, 
+                 df_dotacion: pd.DataFrame, facturacion_no_vencida: float = 0.0) -> pd.DataFrame:
+        """Calcula resumen final según especificaciones del documento"""
+        
+        # Obtener valores base
+        situacion_map = df_situacion.set_index("Concepto")["Valor"].to_dict()
+        focus_map = df_focus.set_index("Concepto")["Valor"].to_dict()
+        dotacion_map = df_dotacion.set_index("Concepto")["Valor"].to_dict()
+        
+        cobros_situacion = situacion_map.get("TOTAL_01010_SALDOS_MES", 0.0)
+        total_vencido = focus_map.get("Total_Vencido", 0.0)
+        total_no_vencido = focus_map.get("Total_No_Vencido", 0.0)
+        vencido_30 = focus_map.get("Vencido_30", 0.0)
+        vencido_60_mas = (focus_map.get("Vencido_60", 0.0) + 
+                         focus_map.get("Vencido_90", 0.0) + 
+                         focus_map.get("Vencido_Mas_90", 0.0))
+        
+        # Cálculos según documento Word
+        # 4. Cobro mes - Vencida = (Deuda bruta vencidas - total vencido >=60) / 1000
+        cobro_mes_vencida = (total_vencido - vencido_60_mas) / self.config["calculos"]["cobro_vencida_divisor"]
+        
+        # 5. Cobro mes - Total = COBROS SITUACION / -1000
+        cobro_mes_total = cobros_situacion / self.config["calculos"]["cobro_total_divisor"]
+        
+        # 6. Cobros mes - No Vencida = Total - Vencida
+        cobro_mes_no_vencida = cobro_mes_total - cobro_mes_vencida
+        
+        # 7. +/- Vencidos mes - vencido = VENCIDO MES 30 días (positivo)
+        ajuste_vencidos_vencido = vencido_30
+        
+        # 8. +/- Vencidos mes - No vencido = valor opuesto
+        ajuste_vencidos_no_vencido = -ajuste_vencidos_vencido
+        
+        # 9. +/- Vencidos mes - Total = vencido - no vencido
+        ajuste_vencidos_total = ajuste_vencidos_vencido - ajuste_vencidos_no_vencido
+        
+        # 10. Facturación mes - vencida = 0
+        fact_mes_vencida = 0.0
+        
+        # 11. Facturación mes - no vencida = Q22-H22
+        fact_mes_no_vencida = facturacion_no_vencida
+        
+        # Dotación del mes
+        dotacion_mes = dotacion_map.get("Dotacion_Mes", 0.0)
+        
+        return pd.DataFrame({
+            "Concepto": [
+                "Cobros_Mes_Total", "Cobros_Mes_Vencida", "Cobros_Mes_No_Vencida",
+                "Ajuste_Vencidos_Vencido", "Ajuste_Vencidos_No_Vencido", "Ajuste_Vencidos_Total",
+                "Facturacion_Mes_Vencida", "Facturacion_Mes_No_Vencida",
+                "Total_Vencido", "Total_No_Vencido", "Total_Deuda",
+                "Dotacion_Mes"
+            ],
+            "Valor": [
+                cobro_mes_total, cobro_mes_vencida, cobro_mes_no_vencida,
+                ajuste_vencidos_vencido, ajuste_vencidos_no_vencido, ajuste_vencidos_total,
+                fact_mes_vencida, fact_mes_no_vencida,
+                total_vencido, total_no_vencido, total_vencido + total_no_vencido,
+                dotacion_mes
+            ]
+        })
+
+# ========================================
+# PROCESADOR PRINCIPAL
+# ========================================
+
+class ProcesadorCarteraUnificado:
+    def __init__(self):
+        self.config = CONFIG
+        asegurar_directorio()
+        
+        # Inicializar procesadores
+        self.proc_balance = ProcesadorBalance(self.config["balance"])
+        self.proc_situacion = ProcesadorSituacion(self.config["situacion"])
+        self.proc_focus = ProcesadorFocus(self.config["focus"])
+        self.proc_dotacion = ProcesadorDotacion()
+        self.proc_acumulado = ProcesadorAcumulado(self.config["acumulado"])
+        self.calculador = CalculadorResumen(self.config)
+    
+    def descubrir_archivos(self, carpeta: str) -> Dict[str, Optional[str]]:
+        """Descubre archivos automáticamente en la carpeta"""
+        archivos = {}
+        for tipo, patrones in self.config["files_patterns"].items():
+            archivos[tipo] = buscar_archivo_patron(carpeta, patrones)
+        return archivos
+    
+    def procesar_carpeta(self, carpeta: str) -> str:
+        """Procesa todos los archivos de una carpeta"""
+        archivos = self.descubrir_archivos(carpeta)
+        return self.procesar_archivos(**archivos)
+    
+    def procesar_archivos(self, balance: str = None, situacion: str = None, 
+                         focus: str = None, dotacion: str = None, acumulado: str = None) -> str:
+        """Procesa archivos individuales y genera Excel consolidado"""
+        
+        resultados = {}
+        
+        # Validar archivos requeridos
+        archivos_requeridos = {"balance": balance, "situacion": situacion, "focus": focus}
+        faltantes = [k for k, v in archivos_requeridos.items() if not v or not os.path.exists(v)]
+        
+        if faltantes:
+            raise FileNotFoundError(f"Archivos faltantes o no encontrados: {', '.join(faltantes)}")
+        
+        # Procesar Balance
+        print("Procesando Balance...")
+        df_balance, df_balance_sumas = self.proc_balance.procesar(balance)
+        resultados["Balance_Normalizado"] = df_balance
+        resultados["Balance_Sumas_Cuentas"] = df_balance_sumas
+        
+        # Procesar Situación
+        print("Procesando Situación...")
+        df_situacion = self.proc_situacion.procesar(situacion)
+        resultados["Situacion_Total_01010"] = df_situacion
+        
+        # Procesar Focus
+        print("Procesando Focus...")
+        df_focus = self.proc_focus.procesar(focus)
+        resultados["Focus_Vencimientos"] = df_focus
+        
+        # Extraer facturación no vencida (Q22-H22)
+        facturacion_no_vencida = self.proc_focus.extraer_facturacion_q22_h22(focus)
+        
+        # Procesar Dotación (opcional)
+        if dotacion and os.path.exists(dotacion):
+            print("Procesando Dotación...")
+            df_dotacion = self.proc_dotacion.procesar(dotacion)
+            resultados["Dotacion_Mes"] = df_dotacion
+        else:
+            print("Dotación no encontrada, usando valores por defecto...")
+            df_dotacion = pd.DataFrame({
+                "Concepto": ["Dotacion_Mes"], 
+                "Valor": [0.0]
+            })
+        
+        # Procesar Acumulado (opcional)
+        if acumulado and os.path.exists(acumulado):
+            print("Procesando Acumulado...")
+            df_acumulado = self.proc_acumulado.procesar(acumulado)
+            resultados["Acumulado"] = df_acumulado
+        
+        # Calcular Resumen Final
+        print("Calculando resumen final...")
+        df_resumen = self.calculador.calcular(df_situacion, df_focus, df_dotacion, facturacion_no_vencida)
+        resultados["Resumen_Final"] = df_resumen
+        
+        # Guardar archivo Excel consolidado
+        return self._guardar_excel_consolidado(resultados)
+    
+    def _guardar_excel_consolidado(self, resultados: Dict[str, pd.DataFrame]) -> str:
+        """Guarda todas las hojas en un Excel consolidado"""
+        nombre_archivo = f"procesamiento_cartera_unificado_{timestamp()}.xlsx"
+        ruta_salida = os.path.join(OUTPUT_DIR, nombre_archivo)
+        
+        with pd.ExcelWriter(ruta_salida, engine="xlsxwriter") as writer:
+            workbook = writer.book
+            
+            # Formato para números con separador de miles
+            formato_numero = workbook.add_format({
+                'num_format': '#,##0.00',
+                'align': 'right'
+            })
+            
+            for nombre_hoja, df in resultados.items():
+                # Limitar nombre de hoja a 31 caracteres
+                nombre_corto = nombre_hoja[:31]
+                df.to_excel(writer, sheet_name=nombre_corto, index=False)
+                
+                worksheet = writer.sheets[nombre_corto]
+                
+                # Aplicar formato a columnas numéricas
+                if 'Valor' in df.columns:
+                    col_idx = df.columns.get_loc('Valor')
+                    worksheet.set_column(col_idx, col_idx, 15, formato_numero)
+                
+                # Auto-ajustar ancho de columnas
+                for i, col in enumerate(df.columns):
+                    max_len = max(len(str(col)), df[col].astype(str).str.len().max())
+                    worksheet.set_column(i, i, min(max_len + 2, 50))
+        
+        print(f"Archivo consolidado generado: {ruta_salida}")
+        return ruta_salida
+
+# ========================================
+# GUI
+# ========================================
+
+class CarteraGUI:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Procesador Unificado de Cartera - Grupo Planeta")
+        self.root.geometry("800x600")
+        self.root.resizable(True, True)
+        
+        self.procesador = ProcesadorCarteraUnificado()
+        self.archivos = {
+            "balance": tk.StringVar(),
+            "situacion": tk.StringVar(), 
+            "focus": tk.StringVar(),
+            "dotacion": tk.StringVar(),
+            "acumulado": tk.StringVar()
+        }
+        
+        self._crear_interfaz()
+        
+    def _crear_interfaz(self):
+        """Crea la interfaz gráfica"""
+        # Título
+        titulo = tk.Label(self.root, text="Procesador Unificado de Cartera", 
+                         font=("Arial", 16, "bold"))
+        titulo.pack(pady=10)
+        
+        # Frame principal
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Sección de selección de archivos
+        archivos_frame = ttk.LabelFrame(main_frame, text="Selección de Archivos", padding=10)
+        archivos_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Archivos individuales
+        row = 0
+        archivos_info = {
+            "balance": ("Balance", "Archivo de balance contable", True),
+            "situacion": ("Situación", "Archivo de situación financiera", True),
+            "focus": ("Focus", "Archivo de vencimientos Focus", True),
+            "dotacion": ("Dotación/Provisión", "Archivo de provisión del mes", False),
+            "acumulado": ("Acumulado", "Archivo de datos acumulados", False)
+        }
+        
+        for key, (nombre, descripcion, requerido) in archivos_info.items():
+            # Etiqueta
+            label_text = f"{nombre}{'*' if requerido else ''}:"
+            label = ttk.Label(archivos_frame, text=label_text, width=20)
+            label.grid(row=row, column=0, sticky=tk.W, padx=(0, 10), pady=5)
+            
+            # Entry
+            entry = ttk.Entry(archivos_frame, textvariable=self.archivos[key], width=50)
+            entry.grid(row=row, column=1, sticky=tk.EW, padx=(0, 10), pady=5)
+            
+            # Botón seleccionar
+            btn = ttk.Button(archivos_frame, text="Seleccionar", 
+                           command=lambda k=key: self._seleccionar_archivo(k))
+            btn.grid(row=row, column=2, padx=(0, 10), pady=5)
+            
+            # Tooltip con descripción
+            self._crear_tooltip(label, descripcion)
+            
+            row += 1
+        
+        # Configurar expansión de columnas
+        archivos_frame.columnconfigure(1, weight=1)
+        
+        # Separador
+        ttk.Separator(archivos_frame, orient=tk.HORIZONTAL).grid(
+            row=row, column=0, columnspan=3, sticky=tk.EW, pady=10)
+        row += 1
+        
+        # Botón seleccionar carpeta
+        ttk.Button(archivos_frame, text="🗂️ Seleccionar Carpeta (Auto-detectar)", 
+                  command=self._seleccionar_carpeta).grid(
+            row=row, column=0, columnspan=3, pady=10)
+        
+        # Frame de acciones
+        acciones_frame = ttk.Frame(main_frame)
+        acciones_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Botón procesar
+        self.btn_procesar = ttk.Button(acciones_frame, text="🚀 Procesar Archivos", 
+                                      command=self._procesar, style="Accent.TButton")
+        self.btn_procesar.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Botón limpiar
+        ttk.Button(acciones_frame, text="🗑️ Limpiar", 
+                  command=self._limpiar_campos).pack(side=tk.LEFT)
+        
+        # Frame de progreso y log
+        progress_frame = ttk.LabelFrame(main_frame, text="Progreso", padding=10)
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Barra de progreso
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var, 
+                                          maximum=100, length=400)
+        self.progress_bar.pack(fill=tk.X, pady=(0, 10))
+        
+        # Área de log
+        log_frame = ttk.Frame(progress_frame)
+        log_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.log_text = tk.Text(log_frame, height=15, wrap=tk.WORD, 
+                               font=("Consolas", 9))
+        scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=scrollbar.set)
+        
+        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Información en la parte inferior
+        info_text = ("* Archivos requeridos: Balance, Situación, Focus\n"
+                    "Los archivos Dotación y Acumulado son opcionales")
+        ttk.Label(main_frame, text=info_text, foreground="gray").pack(pady=5)
+    
+    def _crear_tooltip(self, widget, text):
+        """Crea tooltip para un widget"""
+        def mostrar_tooltip(event):
+            tooltip = tk.Toplevel()
+            tooltip.wm_overrideredirect(True)
+            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            label = tk.Label(tooltip, text=text, background="lightyellow", 
+                           relief="solid", borderwidth=1, wraplength=300)
+            label.pack()
+        
+        def ocultar_tooltip(event):
+            for child in widget.winfo_children():
+                if isinstance(child, tk.Toplevel):
+                    child.destroy()
+        
+        widget.bind("<Enter>", mostrar_tooltip)
+        widget.bind("<Leave>", ocultar_tooltip)
+    
+    def _seleccionar_archivo(self, tipo):
+        """Selecciona archivo individual"""
+        filetypes = [
+            ("Archivos Excel", "*.xlsx *.xls"),
+            ("Archivos CSV", "*.csv"),
+            ("Todos los archivos", "*.*")
+        ]
+        
+        filename = filedialog.askopenfilename(
+            title=f"Seleccionar archivo {tipo.title()}",
+            filetypes=filetypes
+        )
+        
+        if filename:
+            self.archivos[tipo].set(filename)
+            self._log(f"Seleccionado {tipo}: {os.path.basename(filename)}")
+    
+    def _seleccionar_carpeta(self):
+        """Selecciona carpeta y auto-detecta archivos"""
+        carpeta = filedialog.askdirectory(title="Seleccionar carpeta con archivos")
+        
+        if not carpeta:
+            return
+        
+        self._log(f"Analizando carpeta: {carpeta}")
+        
+        # Auto-detectar archivos
+        archivos_encontrados = self.procesador.descubrir_archivos(carpeta)
+        
+        for tipo, ruta in archivos_encontrados.items():
+            if ruta:
+                self.archivos[tipo].set(ruta)
+                self._log(f"Auto-detectado {tipo}: {os.path.basename(ruta)}")
+            else:
+                self.archivos[tipo].set("")
+                self._log(f"No se encontró archivo para {tipo}")
+    
+    def _limpiar_campos(self):
+        """Limpia todos los campos"""
+        for var in self.archivos.values():
+            var.set("")
+        self.log_text.delete(1.0, tk.END)
+        self.progress_var.set(0)
+        self._log("Campos limpiados")
+    
+    def _log(self, mensaje):
+        """Agrega mensaje al log"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_text.insert(tk.END, f"[{timestamp}] {mensaje}\n")
+        self.log_text.see(tk.END)
+        self.root.update_idletasks()
+    
+    def _actualizar_progreso(self, valor, mensaje=""):
+        """Actualiza barra de progreso"""
+        self.progress_var.set(valor)
+        if mensaje:
+            self._log(mensaje)
+        self.root.update_idletasks()
+    
+    def _procesar(self):
+        """Procesa los archivos seleccionados"""
+        try:
+            # Limpiar log anterior
+            self.log_text.delete(1.0, tk.END)
+            self._actualizar_progreso(0, "Iniciando procesamiento...")
+            
+            # Desactivar botón durante procesamiento
+            self.btn_procesar.config(state="disabled")
+            
+            # Obtener rutas de archivos
+            rutas_archivos = {k: v.get().strip() for k, v in self.archivos.items()}
+            
+            # Validar archivos requeridos
+            requeridos = ["balance", "situacion", "focus"]
+            faltantes = []
+            
+            for req in requeridos:
+                if not rutas_archivos[req] or not os.path.exists(rutas_archivos[req]):
+                    faltantes.append(req)
+            
+            if faltantes:
+                raise ValueError(f"Archivos requeridos faltantes: {', '.join(faltantes)}")
+            
+            self._actualizar_progreso(10, "Archivos validados correctamente")
+            
+            # Si hay archivos individuales, procesarlos directamente
+            if all(rutas_archivos[req] for req in requeridos):
+                self._actualizar_progreso(20, "Procesando archivos individuales...")
+                
+                # Procesar cada archivo
+                resultado = self.procesador.procesar_archivos(
+                    balance=rutas_archivos["balance"],
+                    situacion=rutas_archivos["situacion"],
+                    focus=rutas_archivos["focus"],
+                    dotacion=rutas_archivos["dotacion"] if rutas_archivos["dotacion"] else None,
+                    acumulado=rutas_archivos["acumulado"] if rutas_archivos["acumulado"] else None
+                )
+                
+            else:
+                # Si no hay archivos individuales, intentar carpeta
+                carpeta = os.path.dirname(rutas_archivos["balance"]) if rutas_archivos["balance"] else None
+                if not carpeta:
+                    raise ValueError("No se puede determinar carpeta de procesamiento")
+                
+                self._actualizar_progreso(20, f"Procesando carpeta: {carpeta}")
+                resultado = self.procesador.procesar_carpeta(carpeta)
+            
+            self._actualizar_progreso(100, "Procesamiento completado exitosamente")
+            
+            # Mostrar resultado
+            mensaje_exito = (
+                f"✅ Procesamiento completado exitosamente\n\n"
+                f"Archivo generado:\n{resultado}\n\n"
+                f"¿Desea abrir la carpeta de destino?"
+            )
+            
+            respuesta = messagebox.askyesno("Procesamiento Completado", mensaje_exito)
+            
+            if respuesta:
+                # Abrir carpeta en explorador
+                import subprocess
+                subprocess.run(f'explorer "{OUTPUT_DIR}"', shell=True)
+                
+        except Exception as e:
+            self._actualizar_progreso(0, f"❌ Error: {str(e)}")
+            messagebox.showerror("Error de Procesamiento", f"Ocurrió un error:\n\n{str(e)}")
+        
+        finally:
+            # Reactivar botón
+            self.btn_procesar.config(state="normal")
+    
+    def ejecutar(self):
+        """Inicia la aplicación GUI"""
+        # Configurar estilo
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Centrar ventana en pantalla
+        self.root.update_idletasks()
+        x = (self.root.winfo_screenwidth() - self.root.winfo_width()) // 2
+        y = (self.root.winfo_screenheight() - self.root.winfo_height()) // 2
+        self.root.geometry(f"+{x}+{y}")
+        
+        # Mensaje de bienvenida
+        self._log("Bienvenido al Procesador Unificado de Cartera")
+        self._log("Seleccione los archivos individuales o una carpeta para comenzar")
+        
+        # Iniciar loop principal
+        self.root.mainloop()
+
+# ========================================
+# INTERFAZ DE LÍNEA DE COMANDOS
+# ========================================
+
+def main_cli():
+    """Interfaz de línea de comandos"""
+    if len(sys.argv) < 2:
+        print("Uso: python procesador_cartera_unificado.py [carpeta] [--gui]")
+        print("  carpeta: Ruta de la carpeta con los archivos")
+        print("  --gui: Abrir interfaz gráfica")
+        return
+    
+    if "--gui" in sys.argv:
+        gui = CarteraGUI()
+        gui.ejecutar()
+        return
+    
+    carpeta = sys.argv[1]
+    
+    if not os.path.isdir(carpeta):
+        print(f"Error: {carpeta} no es una carpeta válida")
+        return
+    
+    try:
+        print("="*60)
+        print("PROCESADOR UNIFICADO DE CARTERA - GRUPO PLANETA")
+        print("="*60)
+        
+        procesador = ProcesadorCarteraUnificado()
+        resultado = procesador.procesar_carpeta(carpeta)
+        
+        print(f"\n✅ Procesamiento completado exitosamente")
+        print(f"📁 Archivo generado: {resultado}")
+        print("="*60)
+        
+    except Exception as e:
+        print(f"\n❌ Error durante el procesamiento: {str(e)}")
+        sys.exit(1)
+
+# ========================================
+# PUNTO DE ENTRADA
+# ========================================
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and os.path.isdir(sys.argv[1]):
-        try:
-            ruta = ejecutar_proceso(sys.argv[1])
-            print(f"✅ Listo. Archivo generado en:\n{ruta}")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            sys.exit(1)
+    if len(sys.argv) == 1:
+        # Sin argumentos, abrir GUI
+        gui = CarteraGUI()
+        gui.ejecutar()
     else:
-        menu()
+        # Con argumentos, usar CLI
+        main_cli()

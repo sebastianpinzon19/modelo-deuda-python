@@ -1,77 +1,152 @@
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import shutil
 import os
-import sys
-import subprocess
-from datetime import datetime
 
-def validar_fecha(fecha_str):
-    """Valida que la fecha tenga el formato correcto (YYYY-MM-DD)"""
+from modelo_deuda import procesar_modelo_deuda
+from procesador_anticipos import procesar_anticipos
+from procesador_cartera import procesar_cartera
+from procesador_unificado import ProcesadorCarteraUnificado
+from trm_config import load_trm, save_trm
+
+# ================================
+# Configuración inicial
+# ================================
+app = FastAPI(title="Backend Grupo Planeta", version="1.0.0")
+
+# 🔹 Permitir conexión desde frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ⚠️ En producción limitar al dominio PHP
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Carpeta de salidas fijas
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "salidas")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ================================
+#        ENDPOINTS TRM
+# ================================
+@app.get("/trm")
+def get_trm():
+    """Obtener TRM actual"""
+    return load_trm()
+
+@app.post("/trm")
+def post_trm(data: dict):
+    """Actualizar TRM"""
+    usd = data.get("usd")
+    eur = data.get("eur")
+    path = save_trm(usd, eur)
+    return {"status": "ok", "path": path}
+
+# ================================
+#     ENDPOINT MODELO DEUDA
+# ================================
+@app.post("/procesar/modelo_deuda")
+async def procesar_modelo(cartera: UploadFile, anticipos: UploadFile):
     try:
-        fecha = datetime.strptime(fecha_str, '%Y-%m-%d')
-        return fecha
-    except ValueError:
-        return None
+        path_cartera = os.path.join(OUTPUT_DIR, cartera.filename)
+        path_anticipos = os.path.join(OUTPUT_DIR, anticipos.filename)
+        out_path = os.path.join(OUTPUT_DIR, "modelo_deuda_resultado.xlsx")
 
-def solicitar_fecha_cierre():
-    """Solicita al usuario la fecha de cierre"""
-    while True:
-        print("\n=== FECHA DE CIERRE ===")
-        print("La fecha de cierre es la fecha hasta la cual se procesarán los datos.")
-        print("Formato requerido: YYYY-MM-DD (ejemplo: 2024-12-31)")
-        
-        fecha_str = input("Ingrese la fecha de cierre: ").strip()
-        
-        if fecha_str.lower() == 'salir':
-            return None
-            
-        fecha = validar_fecha(fecha_str)
-        if fecha:
-            print(f"Fecha de cierre confirmada: {fecha.strftime('%d/%m/%Y')}")
-            return fecha_str
-        else:
-            print("❌ Formato de fecha incorrecto. Use YYYY-MM-DD (ejemplo: 2024-12-31)")
-            print("O escriba 'salir' para cancelar.")
+        # Guardar archivos subidos
+        with open(path_cartera, "wb") as f:
+            shutil.copyfileobj(cartera.file, f)
+        with open(path_anticipos, "wb") as f:
+            shutil.copyfileobj(anticipos.file, f)
 
-def menu():
-    print("\n=== Procesador de Archivos ===")
-    print("1. Procesar Cartera (CSV)")
-    print("2. Procesar Anticipos (Excel)")
-    print("0. Salir")
-    opcion = input("Seleccione una opción: ")
-    return opcion.strip()
+        # Cargar TRM
+        trm = load_trm()
 
-def procesar_cartera():
-    # Solicitar fecha de cierre
-    fecha_cierre = solicitar_fecha_cierre()
-    if fecha_cierre is None:
-        print("Operación cancelada.")
-        return
-        
-    archivo = input("Ingrese la ruta del archivo CSV de cartera: ").strip()
-    if not os.path.isfile(archivo):
-        print(f"El archivo '{archivo}' no existe.")
-        return
-    comando = [sys.executable, "procesador_cartera.py", archivo, fecha_cierre]
-    print(f"Ejecutando: {' '.join(comando)}")
-    subprocess.run(comando)
+        # Procesar
+        resultado = procesar_modelo_deuda(
+            path_cartera,
+            path_anticipos,
+            trm.get("usd") or 0,
+            trm.get("eur") or 0,
+            out_path
+        )
 
-def procesar_anticipos():
-    archivo = input("Ingrese la ruta del archivo Excel de anticipos: ").strip()
-    if not os.path.isfile(archivo):
-        print(f"El archivo '{archivo}' no existe.")
-        return
-    comando = [sys.executable, "procesador_anticipos.py", archivo]
-    print(f"Ejecutando: {' '.join(comando)}")
-    subprocess.run(comando)
+        return FileResponse(
+            resultado,
+            filename="modelo_deuda.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
-if __name__ == "__main__":
-    while True:
-        op = menu()
-        if op == "1":
-            procesar_cartera()
-        elif op == "2":
-            procesar_anticipos()
-        elif op == "0":
-            print("Saliendo...")
-            break
-        else:
-            print("Opción no válida. Intente de nuevo.") 
+# ================================
+#     ENDPOINT ANTICIPOS
+# ================================
+@app.post("/procesar/anticipos")
+async def procesar_anticipos_api(anticipos: UploadFile):
+    try:
+        path_anticipos = os.path.join(OUTPUT_DIR, anticipos.filename)
+
+        # Guardar archivo
+        with open(path_anticipos, "wb") as f:
+            shutil.copyfileobj(anticipos.file, f)
+
+        resultado = procesar_anticipos(path_anticipos)
+
+        if not resultado:
+            return JSONResponse(content={"error": "No se pudo procesar anticipos"}, status_code=400)
+
+        return FileResponse(
+            resultado,
+            filename="anticipos.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+# ================================
+#     ENDPOINT CARTERA
+# ================================
+@app.post("/procesar/cartera")
+async def procesar_cartera_api(cartera: UploadFile, fecha_cierre: str = Form(None)):
+    try:
+        path_cartera = os.path.join(OUTPUT_DIR, cartera.filename)
+        resultado_path = os.path.join(OUTPUT_DIR, "cartera.xlsx")
+
+        # Guardar archivo
+        with open(path_cartera, "wb") as f:
+            shutil.copyfileobj(cartera.file, f)
+
+        procesar_cartera(path_cartera, output_path=resultado_path, fecha_cierre_str=fecha_cierre)
+
+        return FileResponse(
+            resultado_path,
+            filename="cartera.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+# ================================
+#     ENDPOINT UNIFICADO
+# ================================
+@app.post("/procesar/unificado")
+async def procesar_unificado_api(unificado: UploadFile):
+    try:
+        path_zip = os.path.join(OUTPUT_DIR, unificado.filename)
+
+        # Guardar archivo
+        with open(path_zip, "wb") as f:
+            shutil.copyfileobj(unificado.file, f)
+
+        proc = ProcesadorCarteraUnificado()
+        resultado = proc.procesar_carpeta(OUTPUT_DIR)
+
+        return FileResponse(
+            resultado,
+            filename="unificado.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
